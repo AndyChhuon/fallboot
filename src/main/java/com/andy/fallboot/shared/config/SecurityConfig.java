@@ -1,6 +1,6 @@
-package com.andy.fallboot.config;
+package com.andy.fallboot.shared.config;
 
-import com.andy.fallboot.config.filter.JwtUserProvisioningFilter;
+import com.andy.fallboot.shared.config.filter.JwtUserProvisioningFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

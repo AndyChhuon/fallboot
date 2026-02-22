@@ -1,4 +1,4 @@
-package com.andy.fallboot.entity;
+package com.andy.fallboot.user;
 
 import jakarta.persistence.*;
 
@@ -6,7 +6,7 @@ import jakarta.persistence.*;
 @Table(name = "users")
 public class User {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Long id;
 
     @Column(unique = true, nullable = false)
@@ -24,22 +24,5 @@ public class User {
         this.email = email;
         this.cognitoId = cognitoId;
         this.name = name;
-    }
-
-
-    public String getCognitoId() {
-        return cognitoId;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public Long getId() {
-        return id;
     }
 }

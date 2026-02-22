@@ -1,6 +1,6 @@
-package com.andy.fallboot.config.filter;
+package com.andy.fallboot.shared.config.filter;
 
-import com.andy.fallboot.service.UserService;
+import com.andy.fallboot.user.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
