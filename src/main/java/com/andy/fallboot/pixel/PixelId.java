@@ -26,4 +26,6 @@ public class PixelId implements Serializable {
         this.y = y;
         this.room = room;
     }
+
+    public PixelId() {};
 }

@@ -14,8 +14,8 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public void findOrCreateUser(String cognitoId, String email, String name){
+    public User findOrCreateUser(String cognitoId, String email, String name){
         Optional<User> user = userRepository.findByCognitoId(cognitoId);
-        user.orElseGet(() -> userRepository.save(new User(cognitoId, email, name)));
+        return user.orElseGet(() -> userRepository.save(new User(cognitoId, email, name)));
     }
 }
