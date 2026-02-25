@@ -19,4 +19,12 @@ public class Room {
     public Room(String roomName) {
         this.roomName = roomName;
     }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public String getRoomName() {
+        return roomName;
+    }
 }

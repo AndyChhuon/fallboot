@@ -1,6 +1,7 @@
-package com.andy.fallboot.pixel;
+package com.andy.fallboot.pixel.component;
 
-import org.springframework.security.core.parameters.P;
+import com.andy.fallboot.pixel.Pixel;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,6 +15,7 @@ public class PixelService {
         this.pixelRepository = pixelRepository;
     }
 
+    @Transactional
     public void setPixelColor(UUID roomId, int x, int y, String color, Long userId){
         pixelRepository.upsertPixel(roomId, x, y, color, userId);
     }

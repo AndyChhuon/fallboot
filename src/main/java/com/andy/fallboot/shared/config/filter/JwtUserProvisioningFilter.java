@@ -1,5 +1,6 @@
 package com.andy.fallboot.shared.config.filter;
 
+import com.andy.fallboot.user.User;
 import com.andy.fallboot.user.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -34,7 +35,8 @@ public class JwtUserProvisioningFilter extends OncePerRequestFilter {
                 String email = jwt.getClaimAsString("email");
                 String name = jwt.getClaimAsString("given_name");
 
-                userService.findOrCreateUser(cognitoId, email, name);
+                User user = userService.findOrCreateUser(cognitoId, email, name);
+                request.setAttribute("userId", user.getId());
             }
         }
 
