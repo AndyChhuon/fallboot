@@ -1,6 +1,7 @@
 package com.andy.fallboot.pixel.component;
 
 import com.andy.fallboot.pixel.Pixel;
+import com.andy.fallboot.pixel.PixelDTO;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +21,7 @@ public class PixelService {
         pixelRepository.upsertPixel(roomId, x, y, color, userId);
     }
 
-    public List<Pixel> getRoomPixels(UUID roomId) {
-        return pixelRepository.findByRoomId(roomId);
+    public List<PixelDTO> getRoomPixels(UUID roomId) {
+        return pixelRepository.findByRoomId(roomId).stream().map(PixelDTO::toPixelDTO).toList();
     }
 }

@@ -21,4 +21,26 @@ public class Pixel {
 
     @ManyToOne(fetch = FetchType.LAZY)
     private User lastUpdatedBy;
+
+    protected Pixel() {}
+
+    public Room getRoom() {
+        return room;
+    }
+
+    public int getX() {
+        return x;
+    }
+
+    public int getY() {
+        return y;
+    }
+
+    public String getColor() {
+        return color;
+    }
+
+    public User getLastUpdatedBy() {
+        return lastUpdatedBy;
+    }
 }

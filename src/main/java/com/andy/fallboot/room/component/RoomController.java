@@ -1,5 +1,6 @@
-package com.andy.fallboot.room;
+package com.andy.fallboot.room.component;
 
+import com.andy.fallboot.room.RoomDTO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,7 +17,7 @@ public class RoomController {
     }
 
     @GetMapping("/rooms")
-    public List<Room> getRooms() {
+    public List<RoomDTO> getRooms() {
         return roomService.getAllRooms();
     }
 }
