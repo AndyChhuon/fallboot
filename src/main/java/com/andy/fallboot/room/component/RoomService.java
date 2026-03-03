@@ -1,5 +1,7 @@
-package com.andy.fallboot.room;
+package com.andy.fallboot.room.component;
 
+import com.andy.fallboot.room.Room;
+import com.andy.fallboot.room.RoomDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +20,7 @@ public class RoomService {
         roomRepository.save(new Room(roomName));
     }
 
-    public List<Room> getAllRooms() {
-        return roomRepository.findAll();
+    public List<RoomDTO> getAllRooms() {
+        return roomRepository.findAll().stream().map(RoomDTO::toRoomDTO).toList();
     }
 }

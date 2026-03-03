@@ -19,7 +19,10 @@ export default function Home() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rooms`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(setRooms)
       .catch((err) => console.error("Failed to fetch rooms:", err));
   }, [accessToken]);
@@ -27,7 +30,9 @@ export default function Home() {
   if (!accessToken) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-50 dark:bg-black">
-        <h1 className="text-2xl font-semibold text-black dark:text-white">Fallboot</h1>
+        <h1 className="text-2xl font-semibold text-black dark:text-white">
+          Fallboot
+        </h1>
         <button
           onClick={login}
           className="rounded-full bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700"
@@ -41,7 +46,9 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col items-center gap-6 bg-zinc-50 p-8 dark:bg-black">
       <div className="flex w-full max-w-lg items-center justify-between">
-        <h1 className="text-2xl font-semibold text-black dark:text-white">Rooms</h1>
+        <h1 className="text-2xl font-semibold text-black dark:text-white">
+          Rooms
+        </h1>
         <button
           onClick={logout}
           className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"

@@ -19,6 +19,9 @@ export default function RoomPage() {
   const connect = () => {
     const client = new Client({
       brokerURL: process.env.NEXT_PUBLIC_WS_URL,
+      connectHeaders: {
+        Authorization: `Bearer ${accessToken}`,
+      },
       onConnect: () => {
         setConnected(true);
         client.subscribe(`/topic/room/${roomId}`, (message) => {
@@ -26,7 +29,8 @@ export default function RoomPage() {
         });
       },
       onDisconnect: () => setConnected(false),
-      onStompError: (frame) => console.error("STOMP error:", frame.headers["message"]),
+      onStompError: (frame) =>
+        console.error("STOMP error:", frame.headers["message"]),
     });
     client.activate();
     clientRef.current = client;
@@ -49,8 +53,12 @@ export default function RoomPage() {
   return (
     <div className="flex min-h-screen flex-col items-center gap-6 bg-zinc-50 p-8 dark:bg-black">
       <div className="flex w-full max-w-lg items-center justify-between">
-        <Link href="/" className="text-blue-500 hover:underline">Back to Rooms</Link>
-        <h1 className="text-xl font-semibold text-black dark:text-white">Room {roomId}</h1>
+        <Link href="/" className="text-blue-500 hover:underline">
+          Back to Rooms
+        </Link>
+        <h1 className="text-xl font-semibold text-black dark:text-white">
+          Room {roomId}
+        </h1>
       </div>
 
       <button
@@ -98,7 +106,10 @@ export default function RoomPage() {
             <p className="text-zinc-400">No messages yet...</p>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className="border-b border-zinc-100 py-1 dark:border-zinc-800">
+              <div
+                key={i}
+                className="border-b border-zinc-100 py-1 dark:border-zinc-800"
+              >
                 {msg}
               </div>
             ))
