@@ -28,6 +28,7 @@ public class PixelMessageController {
         Long userId = Long.parseLong(principal.getName());
 
         pixelService.setPixelColor(roomId, message.getX(), message.getY(), message.getColor(), userId);
+        message.setLastUpdatedBy(userId);
         return message;
     }
 
