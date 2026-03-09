@@ -30,15 +30,16 @@ export function useRoom(
       .then((res) => res.json())
       .then(
         (
-          pixels: {
+          pixels: Record<string, {
             x: number;
             y: number;
             color: string;
             lastUpdatedBy: number | null;
-          }[]
+          }>
         ) => {
-          pixels.forEach((p) => {
-            pixelsRef.current.set(`${p.x},${p.y}`, {
+          Object.entries(pixels).forEach(([key, p]) => {
+            const [x, y] = key.split(":").map(Number);
+            pixelsRef.current.set(`${x},${y}`, {
               color: p.color,
               lastUpdatedBy: p.lastUpdatedBy,
             });

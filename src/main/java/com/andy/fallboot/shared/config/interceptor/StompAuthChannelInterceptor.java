@@ -1,7 +1,7 @@
 package com.andy.fallboot.shared.config.interceptor;
 
-import com.andy.fallboot.user.User;
-import com.andy.fallboot.user.UserService;
+import com.andy.fallboot.user.UserDTO;
+import com.andy.fallboot.user.component.UserService;
 import org.jspecify.annotations.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -40,9 +40,9 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 String email = jwt.getClaimAsString("email");
                 String name = jwt.getClaimAsString("given_name");
 
-                User user = userService.findOrCreateUser(cognitoId, email, name);
+                UserDTO user = userService.findOrCreateUser(cognitoId, email, name);
 
-                accessor.setUser(new StompPrincipal(user.getId().toString()));
+                accessor.setUser(new StompPrincipal(user.id().toString()));
             } else {
                 throw new MessagingException("Missing or invalid Authorization header");
             }
