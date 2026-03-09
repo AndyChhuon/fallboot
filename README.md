@@ -28,8 +28,14 @@ This starts a PostgreSQL 17 container on `localhost:5432`.
 ### 2. Run the application
 
 ```bash
+# With Cognito auth
 ./mvnw spring-boot:run
+
+# With mock JWT auth (dev/load testing — no Cognito needed)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=loadtest
 ```
+
+When using the `loadtest` profile, start a load test simulation first to run the mock JWKS server on port 9999. See `fallboot-load-testing/README.md` for details.
 
 ### 3. Stop the database
 

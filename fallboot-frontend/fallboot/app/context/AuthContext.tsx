@@ -27,7 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [accessToken]);
 
-  const login = () => {
+  const login = async () => {
+    const mockTokenUrl = process.env.NEXT_PUBLIC_MOCK_TOKEN_URL;
+    if (mockTokenUrl) {
+      const res = await fetch(`${mockTokenUrl}/token?userIndex=0`);
+      const data = await res.json();
+      setAccessToken(data.access_token);
+      return;
+    }
     const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID;
     const domain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
     const redirectUri = process.env.NEXT_PUBLIC_REDIRECT_URI;
