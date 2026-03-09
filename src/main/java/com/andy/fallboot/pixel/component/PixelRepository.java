@@ -2,7 +2,6 @@ package com.andy.fallboot.pixel.component;
 
 import com.andy.fallboot.pixel.Pixel;
 import com.andy.fallboot.pixel.PixelId;
-import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

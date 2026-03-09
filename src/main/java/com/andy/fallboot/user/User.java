@@ -29,4 +29,16 @@ public class User {
     public Long getId(){
         return id;
     }
+
+    public String getCognitoId() {
+        return cognitoId;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public String getName() {
+        return name;
+    }
 }
