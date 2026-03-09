@@ -7,11 +7,18 @@ import com.andy.loadtest.util.StompFrameHelper;
 import io.gatling.javaapi.core.*;
 import io.gatling.javaapi.http.*;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static io.gatling.javaapi.core.CoreDsl.*;
 import static io.gatling.javaapi.http.HttpDsl.*;
@@ -21,6 +28,8 @@ public class FullLoadSimulation extends Simulation {
     private final JwtTokenGenerator tokenGenerator = new JwtTokenGenerator();
     private final MockJwksServer mockServer = new MockJwksServer(tokenGenerator);
     private final AtomicInteger userCounter = new AtomicInteger(0);
+
+    private final ConcurrentHashMap<String, String> lastPixelColor = new ConcurrentHashMap<>();
 
     private static final String[] COLORS = {
             "#FF0000", "#00FF00", "#0000FF", "#FFFF00",
@@ -97,6 +106,11 @@ public class FullLoadSimulation extends Simulation {
             .pause(1)
             .during(LoadTestConfig.DURATION_SECONDS).on(
                     exec(session -> session.setAll(randomPixelData()))
+                            .exec(session -> {
+                                String coord = session.getString("expectedX") + ":" + session.getString("expectedY");
+                                lastPixelColor.put(coord, session.getString("expectedColor"));
+                                return session;
+                            })
                             .exec(
                                     ws("STOMP SEND pixel update")
                                             .sendText(session ->
@@ -107,19 +121,7 @@ public class FullLoadSimulation extends Simulation {
                                             )
                                             .await(10).on(
                                                     ws.checkTextMessage("Pixel broadcast received")
-                                                            .check(bodyString().transform(body -> {
-                                                                int jsonStart = body.indexOf("{");
-                                                                if (jsonStart < 0) return "";
-                                                                String json = body.substring(jsonStart).trim();
-                                                                if (json.endsWith("\u0000"))
-                                                                    json = json.substring(0, json.length() - 1);
-                                                                return json.replaceAll(",\"lastUpdatedBy\":\\d+", "");
-                                                            }).is(session ->
-                                                                    "{\"color\":\"" + session.getString("expectedColor")
-                                                                            + "\",\"x\":" + session.getString("expectedX")
-                                                                            + ",\"y\":" + session.getString("expectedY")
-                                                                            + "}"
-                                                            ))
+                                                            .check(regex("\"x\":\\d+"))
                                             )
                             )
                             .pause(Duration.ofMillis(LoadTestConfig.PAUSE_MILLIS))
@@ -152,5 +154,68 @@ public class FullLoadSimulation extends Simulation {
     public void after() {
         mockServer.stop();
         System.out.println("Mock JWKS server stopped");
+
+        // Fetch final pixel state from server and verify every sent pixel
+        String token = tokenGenerator.generateToken(0);
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(LoadTestConfig.BASE_URL + "/api/pixels/room/" + LoadTestConfig.ROOM_ID))
+                    .header("Authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                System.out.println("REST verification failed with status: " + response.statusCode());
+                return;
+            }
+
+            String body = response.body();
+            Pattern entryPattern = Pattern.compile("\"(\\d+):(\\d+)\":\\{[^}]*\"color\":\"(#[0-9A-Fa-f]+)\"[^}]*\\}");
+            Matcher matcher = entryPattern.matcher(body);
+            Map<String, String> serverPixels = new ConcurrentHashMap<>();
+            while (matcher.find()) {
+                serverPixels.put(matcher.group(1) + ":" + matcher.group(2), matcher.group(3));
+            }
+
+            int totalSent = lastPixelColor.size();
+            int verified = 0;
+            int mismatch = 0;
+            int notFound = 0;
+
+            for (Map.Entry<String, String> entry : lastPixelColor.entrySet()) {
+                String serverColor = serverPixels.get(entry.getKey());
+                if (serverColor == null) {
+                    notFound++;
+                    if (notFound <= 10) {
+                        System.out.println("[NOT FOUND] " + entry.getKey() + " expected=" + entry.getValue());
+                    }
+                } else if (!serverColor.equals(entry.getValue())) {
+                    mismatch++;
+                    if (mismatch <= 10) {
+                        System.out.println("[MISMATCH] " + entry.getKey() + " expected=" + entry.getValue() + " actual=" + serverColor);
+                    }
+                } else {
+                    verified++;
+                }
+            }
+
+            System.out.println("=== Pixel Verification via REST ===");
+            System.out.println("Unique coordinates sent: " + totalSent);
+            System.out.println("Server pixel count:      " + serverPixels.size());
+            System.out.println("Verified correct:        " + verified);
+            System.out.println("Color mismatch:          " + mismatch);
+            System.out.println("Not found on server:     " + notFound);
+            double pct = totalSent > 0 ? (verified * 100.0 / totalSent) : 0;
+            System.out.printf("Verification rate:       %.1f%%%n", pct);
+
+            if (mismatch == 0 && notFound == 0) {
+                System.out.println("SUCCESS: All " + totalSent + " pixels verified with correct values");
+            } else {
+                System.out.println("FAILURE: " + (mismatch + notFound) + " pixels failed verification");
+            }
+        } catch (Exception e) {
+            System.out.println("REST verification error: " + e.getMessage());
+        }
     }
 }

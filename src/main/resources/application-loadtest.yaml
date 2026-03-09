@@ -6,6 +6,12 @@ spring:
   data:
     redis:
       port: 6379
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 50
+          max-idle: 20
+          min-idle: 5
   jpa:
     show-sql: false
   security:
