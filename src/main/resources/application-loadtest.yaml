@@ -3,6 +3,8 @@ spring:
     url: jdbc:postgresql://localhost:5432/fallboot
     username: myUser
     password: password1234
+    hikari:
+      maximum-pool-size: 50
   data:
     redis:
       port: 6379

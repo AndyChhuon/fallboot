@@ -2,14 +2,22 @@ package com.andy.fallboot.room.component;
 
 import com.andy.fallboot.room.Room;
 import com.andy.fallboot.room.RoomDTO;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
 
 @Service
 public class RoomService {
-    private RoomRepository roomRepository;
+    private static final String ROOMS_KEY = "all_rooms";
+    private final RoomRepository roomRepository;
+    private final Cache<String, List<RoomDTO>> localCache = Caffeine.newBuilder()
+            .maximumSize(1)
+            .expireAfterWrite(Duration.ofMinutes(5))
+            .build();
 
     @Autowired
     public RoomService(RoomRepository roomRepository) {
@@ -18,9 +26,11 @@ public class RoomService {
 
     public void createRoom(String roomName){
         roomRepository.save(new Room(roomName));
+        localCache.invalidate(ROOMS_KEY);
     }
 
     public List<RoomDTO> getAllRooms() {
-        return roomRepository.findAll().stream().map(RoomDTO::toRoomDTO).toList();
+        return localCache.get(ROOMS_KEY, _ ->
+                roomRepository.findAll().stream().map(RoomDTO::toRoomDTO).toList());
     }
 }
