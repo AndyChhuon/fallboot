@@ -6,6 +6,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.transaction.Transactional;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -30,6 +31,7 @@ public class PixelService {
     }
 
     @Transactional
+    @Async("pixelPersistExecutor")
     public void setPixelColor(UUID roomId, int x, int y, String color, Long userId){
         pixelRepository.upsertPixel(roomId, x, y, color, userId);
         hashOps.put("room:"+roomId+":pixels", x+":"+y, new PixelDTO(roomId,x,y,color,userId));
