@@ -1,6 +1,6 @@
 package com.andy.fallboot.pixel.component;
 
-import com.andy.fallboot.pixel.PixelDTO;
+import com.andy.fallboot.shared.pixelEntities.PixelDTO;
 import com.andy.fallboot.pixel.PixelMessage;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;

@@ -86,14 +86,14 @@ This starts PostgreSQL 17 on `localhost:5432` and Redis on `localhost:6379`.
 ### 2. Run the application
 
 ```bash
-cd fallboot-backend
+./mvnw clean install
 
 # With Cognito auth
-./mvnw spring-boot:run
-
+ ./mvnw spring-boot:run -pl fallboot-backend
+ 
 # With mock JWT auth (dev/load testing — no Cognito needed)
-./mvnw spring-boot:run -Dspring-boot.run.profiles=loadtest
-```
+ ./mvnw spring-boot:run -pl fallboot-backend -Dspring-boot.run.profiles=loadtest
+ ```
 
 When using the `loadtest` profile, start a load test simulation first to run the mock JWKS server on port 9999. See `fallboot-load-testing/README.md` for details.
 

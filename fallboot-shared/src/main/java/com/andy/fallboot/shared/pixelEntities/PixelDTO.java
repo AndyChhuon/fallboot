@@ -1,6 +1,6 @@
-package com.andy.fallboot.pixel;
+package com.andy.fallboot.shared.pixelEntities;
 
-import com.andy.fallboot.user.User;
+import com.andy.fallboot.shared.userEntities.User;
 
 import java.util.Optional;
 import java.util.UUID;

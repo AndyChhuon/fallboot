@@ -1,4 +1,4 @@
-package com.andy.fallboot.pixel;
+package com.andy.fallboot.shared.pixelEntities;
 
 import java.io.Serializable;
 import java.util.Objects;

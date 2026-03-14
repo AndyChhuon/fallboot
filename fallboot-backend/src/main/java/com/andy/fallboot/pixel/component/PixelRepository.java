@@ -1,7 +1,7 @@
 package com.andy.fallboot.pixel.component;
 
-import com.andy.fallboot.pixel.Pixel;
-import com.andy.fallboot.pixel.PixelId;
+import com.andy.fallboot.shared.pixelEntities.Pixel;
+import com.andy.fallboot.shared.pixelEntities.PixelId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

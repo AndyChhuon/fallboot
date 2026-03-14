@@ -1,6 +1,6 @@
-package com.andy.fallboot.user.component;
+package com.andy.fallboot.user;
 
-import com.andy.fallboot.user.User;
+import com.andy.fallboot.shared.userEntities.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

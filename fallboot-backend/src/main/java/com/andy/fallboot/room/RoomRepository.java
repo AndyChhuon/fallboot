@@ -1,6 +1,6 @@
-package com.andy.fallboot.room.component;
+package com.andy.fallboot.room;
 
-import com.andy.fallboot.room.Room;
+import com.andy.fallboot.shared.roomEntities.Room;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

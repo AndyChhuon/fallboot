@@ -1,6 +1,6 @@
 package com.andy.fallboot.pixel.component;
 
-import com.andy.fallboot.pixel.PixelDTO;
+import com.andy.fallboot.shared.pixelEntities.PixelDTO;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.transaction.Transactional;
