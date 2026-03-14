@@ -86,6 +86,8 @@ This starts PostgreSQL 17 on `localhost:5432` and Redis on `localhost:6379`.
 ### 2. Run the application
 
 ```bash
+cd fallboot-backend
+
 # With Cognito auth
 ./mvnw spring-boot:run
 
