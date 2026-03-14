@@ -30,7 +30,7 @@ public class PixelMessageController {
             @DestinationVariable("roomId") UUID roomId,
             PixelMessage message, Principal principal) {
         Long userId = Long.parseLong(principal.getName());
-        log.info("Pixel update: user={} room={} x={} y={} color={}", userId, roomId, message.getX(), message.getY(), message.getColor());
+        log.debug("Pixel update: user={} room={} x={} y={} color={}", userId, roomId, message.getX(), message.getY(), message.getColor());
 
         pixelService.setPixelColor(roomId, message.getX(), message.getY(), message.getColor(), userId);
         message.setLastUpdatedBy(userId);
