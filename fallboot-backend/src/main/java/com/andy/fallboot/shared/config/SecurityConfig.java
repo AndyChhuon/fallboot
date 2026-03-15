@@ -33,7 +33,7 @@ public class SecurityConfig {
         .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/public/**", "/ws/**").permitAll()
+                .requestMatchers("/public/**", "/ws/**", "/error").permitAll()
                 .requestMatchers("/api/**").authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> {
