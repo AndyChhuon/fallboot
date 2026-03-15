@@ -1,7 +1,7 @@
-package com.andy.fallboot.pixel;
+package com.andy.fallboot.shared.pixelEntities;
 
-import com.andy.fallboot.room.Room;
-import com.andy.fallboot.user.User;
+import com.andy.fallboot.shared.roomEntities.Room;
+import com.andy.fallboot.shared.userEntities.User;
 import jakarta.persistence.*;
 
 @Entity

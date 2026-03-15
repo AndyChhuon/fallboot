@@ -1,15 +1,37 @@
+server:
+  compression:
+    enabled: true
+    min-response-size: 1024
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/fallboot
     username: myUser
     password: password1234
+    hikari:
+      maximum-pool-size: 50
   data:
     redis:
       port: 6379
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 50
+          max-idle: 20
+          min-idle: 5
   jpa:
-    show-sql: true
+    show-sql: false
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_W61ZUEYKp
+  kafka:
+    topic:
+      name: pixel-updates
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        linger.ms: 50
+        batch.size: 65536

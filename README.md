@@ -86,18 +86,24 @@ This starts PostgreSQL 17 on `localhost:5432` and Redis on `localhost:6379`.
 ### 2. Run the application
 
 ```bash
-cd fallboot-backend
+./mvnw clean install
 
 # With Cognito auth
-./mvnw spring-boot:run
-
+ ./mvnw spring-boot:run -pl fallboot-backend
+ 
 # With mock JWT auth (dev/load testing — no Cognito needed)
-./mvnw spring-boot:run -Dspring-boot.run.profiles=loadtest
-```
+ ./mvnw spring-boot:run -pl fallboot-backend -Dspring-boot.run.profiles=loadtest
+ ```
 
 When using the `loadtest` profile, start a load test simulation first to run the mock JWKS server on port 9999. See `fallboot-load-testing/README.md` for details.
 
-### 3. Run the load test
+### 3. Run the kafka microservice
+```bash
+
+./mvnw spring-boot:run -pl fallboot-kafka -Dspring-boot.run.profiles=dev
+ ```
+
+### 4. Run the load test
 
 ```bash
 cd fallboot-load-testing
@@ -114,7 +120,14 @@ open target/gatling/*/index.html
 
 See [fallboot-load-testing/README.md](fallboot-load-testing/README.md) for more configuration options.
 
-### 4. Stop the database
+### 5. Clear the services
+```bash
+docker exec fallboot-postgres-dev psql -U myUser -d fallboot -c "DELETE FROM pixel;"
+docker exec fallboot-redis-1 redis-cli FLUSHALL
+docker exec fallboot-kafka-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic pixel-updates
+```
+
+### 6. Stop the services
 
 ```bash
 docker compose down

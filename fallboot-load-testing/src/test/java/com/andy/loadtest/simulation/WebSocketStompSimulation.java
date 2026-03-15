@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -137,7 +138,10 @@ public class WebSocketStompSimulation extends Simulation {
         mockServer.stop();
         System.out.println("Mock JWKS server stopped");
 
-        // Fetch final pixel state from server and verify every sent pixel
+        System.out.println("Press Enter to evaluate after Kafka is done processing...");
+        new Scanner(System.in).nextLine();
+
+        // Fetch final pixel state from server and verify every sent pixel (likely hits caffeine/redis)
         String token = tokenGenerator.generateToken(0);
         try (HttpClient client = HttpClient.newHttpClient()) {
             HttpRequest request = HttpRequest.newBuilder()
@@ -153,7 +157,7 @@ public class WebSocketStompSimulation extends Simulation {
             }
 
             String body = response.body();
-            Pattern entryPattern = Pattern.compile("\"(\\d+):(\\d+)\":\\{[^}]*\"color\":\"(#[0-9A-Fa-f]+)\"[^}]*\\}");
+            Pattern entryPattern = Pattern.compile("\"(\\d+):(\\d+)\":\"(#[0-9A-Fa-f]+)\"");
             Matcher matcher = entryPattern.matcher(body);
             Map<String, String> serverPixels = new ConcurrentHashMap<>();
             while (matcher.find()) {
@@ -195,6 +199,62 @@ public class WebSocketStompSimulation extends Simulation {
                 System.out.println("SUCCESS: All " + totalSent + " pixels verified with correct values");
             } else {
                 System.out.println("FAILURE: " + (mismatch + notFound) + " pixels failed verification");
+            }
+            
+            // Verify kafka properly saved in DB
+            HttpRequest dbRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(LoadTestConfig.BASE_URL + "/api/pixels/room/test-verification/" + LoadTestConfig.ROOM_ID))
+                    .header("Authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+            HttpResponse<String> dbResponse = client.send(dbRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (dbResponse.statusCode() != 200) {
+                System.out.println("DB verification failed with status: " + dbResponse.statusCode());
+                return;
+            }
+
+            String dbBody = dbResponse.body();
+            Matcher dbMatcher = entryPattern.matcher(dbBody);
+            Map<String, String> dbPixels = new ConcurrentHashMap<>();
+            while (dbMatcher.find()) {
+                dbPixels.put(dbMatcher.group(1) + ":" + dbMatcher.group(2), dbMatcher.group(3));
+            }
+
+            int dbVerified = 0;
+            int dbMismatch = 0;
+            int dbNotFound = 0;
+
+            for (Map.Entry<String, String> entry : lastPixelColor.entrySet()) {
+                String dbColor = dbPixels.get(entry.getKey());
+                if (dbColor == null) {
+                    dbNotFound++;
+                    if (dbNotFound <= 10) {
+                        System.out.println("[DB NOT FOUND] " + entry.getKey() + " expected=" + entry.getValue());
+                    }
+                } else if (!dbColor.equals(entry.getValue())) {
+                    dbMismatch++;
+                    if (dbMismatch <= 10) {
+                        System.out.println("[DB MISMATCH] " + entry.getKey() + " expected=" + entry.getValue() + " actual=" + dbColor);
+                    }
+                } else {
+                    dbVerified++;
+                }
+            }
+
+            System.out.println("=== Pixel Verification via DB ===");
+            System.out.println("Unique coordinates sent: " + totalSent);
+            System.out.println("DB pixel count:          " + dbPixels.size());
+            System.out.println("Verified correct:        " + dbVerified);
+            System.out.println("Color mismatch:          " + dbMismatch);
+            System.out.println("Not found in DB:         " + dbNotFound);
+            double dbPct = totalSent > 0 ? (dbVerified * 100.0 / totalSent) : 0;
+            System.out.printf("Verification rate:       %.1f%%%n", dbPct);
+
+            if (dbMismatch == 0 && dbNotFound == 0) {
+                System.out.println("SUCCESS: All " + totalSent + " pixels verified in DB");
+            } else {
+                System.out.println("FAILURE: " + (dbMismatch + dbNotFound) + " pixels failed DB verification");
             }
         } catch (Exception e) {
             System.out.println("REST verification error: " + e.getMessage());

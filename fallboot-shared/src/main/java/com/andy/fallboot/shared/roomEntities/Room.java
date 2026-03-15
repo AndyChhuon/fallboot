@@ -1,4 +1,4 @@
-package com.andy.fallboot.room;
+package com.andy.fallboot.shared.roomEntities;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

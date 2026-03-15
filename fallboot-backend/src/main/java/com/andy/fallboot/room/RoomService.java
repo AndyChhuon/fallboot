@@ -1,7 +1,7 @@
-package com.andy.fallboot.room.component;
+package com.andy.fallboot.room;
 
-import com.andy.fallboot.room.Room;
-import com.andy.fallboot.room.RoomDTO;
+import com.andy.fallboot.shared.roomEntities.Room;
+import com.andy.fallboot.shared.roomEntities.RoomDTO;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.beans.factory.annotation.Autowired;

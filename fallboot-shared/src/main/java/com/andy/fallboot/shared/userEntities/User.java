@@ -1,4 +1,4 @@
-package com.andy.fallboot.user;
+package com.andy.fallboot.shared.userEntities;
 
 import jakarta.persistence.*;
 

@@ -3,16 +3,13 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.2</version>
-		<relativePath/> <!-- lookup parent from repository -->
+        <groupId>com.andy</groupId>
+        <artifactId>fallboot-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
 	</parent>
-	<groupId>com.andy</groupId>
-	<artifactId>fallboot</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>fallboot</name>
-	<description>Not Spring Boot, Not football, Fall Boot</description>
+	<artifactId>fallboot-backend</artifactId>
+	<name>fallboot backend</name>
+	<description>Fall Boot Backend</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -26,38 +23,15 @@
 		<tag/>
 		<url/>
 	</scm>
-	<properties>
-		<java.version>25</java.version>
-		<assertj.version>3.27.7</assertj.version>
-	</properties>
 	<dependencies>
         <!-- Spring boot -->
-        <dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
-		</dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -71,11 +45,22 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-pool2</artifactId>
         </dependency>
-        <!-- JDBC -->
         <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Shared entities -->
+        <dependency>
+            <groupId>com.andy</groupId>
+            <artifactId>fallboot-shared</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <!-- Caffeine -->

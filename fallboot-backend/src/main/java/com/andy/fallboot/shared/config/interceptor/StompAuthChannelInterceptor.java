@@ -1,7 +1,7 @@
 package com.andy.fallboot.shared.config.interceptor;
 
-import com.andy.fallboot.user.UserDTO;
-import com.andy.fallboot.user.component.UserService;
+import com.andy.fallboot.shared.userEntities.UserDTO;
+import com.andy.fallboot.user.UserService;
 import org.jspecify.annotations.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;

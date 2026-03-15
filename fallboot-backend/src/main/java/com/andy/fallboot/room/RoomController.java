@@ -1,6 +1,6 @@
-package com.andy.fallboot.room.component;
+package com.andy.fallboot.room;
 
-import com.andy.fallboot.room.RoomDTO;
+import com.andy.fallboot.shared.roomEntities.RoomDTO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;

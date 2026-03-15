@@ -19,11 +19,9 @@ export function PlaceButton({
             className="inline-block h-4 w-4 rounded-sm border border-zinc-600"
             style={{ backgroundColor: selectedPixel.color }}
           />
-          <span>
-            {selectedPixel.lastUpdatedBy !== null
-              ? `User ${selectedPixel.lastUpdatedBy}`
-              : "Empty"}
-          </span>
+          {selectedPixel.lastUpdatedBy !== null && (
+            <span>User {selectedPixel.lastUpdatedBy}</span>
+          )}
         </div>
       )}
       <button

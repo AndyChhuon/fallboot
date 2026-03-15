@@ -29,19 +29,12 @@ export function useRoom(
     })
       .then((res) => res.json())
       .then(
-        (
-          pixels: Record<string, {
-            x: number;
-            y: number;
-            color: string;
-            lastUpdatedBy: number | null;
-          }>
-        ) => {
-          Object.entries(pixels).forEach(([key, p]) => {
+        (response: { roomUID: string; pixelsMap: Record<string, string> }) => {
+          Object.entries(response.pixelsMap).forEach(([key, color]) => {
             const [x, y] = key.split(":").map(Number);
             pixelsRef.current.set(`${x},${y}`, {
-              color: p.color,
-              lastUpdatedBy: p.lastUpdatedBy,
+              color,
+              lastUpdatedBy: null,
             });
           });
           redraw();
@@ -55,19 +48,21 @@ export function useRoom(
       onConnect: () => {
         setConnected(true);
         client.subscribe(`/topic/room/${roomId}`, (msg) => {
-          const data = JSON.parse(msg.body);
-          const key = `${data.x},${data.y}`;
-          pixelsRef.current.set(key, {
-            color: data.color,
-            lastUpdatedBy: data.lastUpdatedBy ?? null,
+          const updates: Array<{ x: number; y: number; color: string; lastUpdatedBy: number | null }> = JSON.parse(msg.body);
+          updates.forEach((data) => {
+            const key = `${data.x},${data.y}`;
+            pixelsRef.current.set(key, {
+              color: data.color,
+              lastUpdatedBy: data.lastUpdatedBy ?? null,
+            });
+            drawPixel(data.x, data.y, data.color);
+            onPixelUpdate(
+              data.x,
+              data.y,
+              data.color,
+              data.lastUpdatedBy ?? null
+            );
           });
-          drawPixel(data.x, data.y, data.color);
-          onPixelUpdate(
-            data.x,
-            data.y,
-            data.color,
-            data.lastUpdatedBy ?? null
-          );
         });
       },
       onDisconnect: () => setConnected(false),
