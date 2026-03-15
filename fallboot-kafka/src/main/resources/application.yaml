@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: fallboot-kafka
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+  profiles:
+    active: dev

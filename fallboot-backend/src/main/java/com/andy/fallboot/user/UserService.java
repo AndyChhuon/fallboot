@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 public class UserService {
     private final UserRepository userRepository;
     private final Cache<String, UserDTO> localCache = Caffeine.newBuilder()
-            .maximumSize(5_000)
+            .maximumSize(1_000_000)
             .build();
 
     public UserService(UserRepository userRepository) {

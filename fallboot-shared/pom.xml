@@ -8,7 +8,6 @@
         <version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>fallboot-shared</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
     <name>fallboot shared</name>
     <description>Fall Boot Shared Entities and helpers</description>
 </project>

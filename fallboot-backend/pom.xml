@@ -8,7 +8,6 @@
         <version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>fallboot-backend</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
 	<name>fallboot backend</name>
 	<description>Fall Boot Backend</description>
 	<url/>
@@ -61,7 +60,7 @@
         <dependency>
             <groupId>com.andy</groupId>
             <artifactId>fallboot-shared</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
 
         <!-- Caffeine -->
