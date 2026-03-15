@@ -6,7 +6,7 @@ A real-time collaborative pixel canvas (r/Place like) built to scale under REST 
 
 Push requests per second and concurrent users as high as possible for a scenario where a suddent burst of users each:
 1. Fetch available rooms (`GET /api/rooms`)
-2. Fetch all pixels (1000x1000) in a room (`GET /api/pixels/room/{roomId}`) to initialize the canvas
+2. Fetch all pixels in a room (`GET /api/pixels/room/{roomId}`) to initialize the canvas (1000x1000)
 3. Connect via WebSocket (STOMP)
 4. Send and receive real-time pixel updates
 
@@ -16,12 +16,14 @@ Push requests per second and concurrent users as high as possible for a scenario
 - PostgreSQL 17 (persistence)
 - Redis (distributed cache)
 - Caffeine (in-process cache)
+- Apache Kafka (async processing of writes)
 - STOMP over WebSocket (real-time messaging)
 - Gatling (load testing)
 
 ## Load Test Runs
 
-**Current max:** 2,000 concurrent users | 99.5% success | ~5,822 req/sec
+**Peak:** 10,000 concurrent users | 91.7% success | ~11,628 req/sec  
+**Stable:** 5,000 concurrent users | 100% success | ~7,751 req/sec
 
 ### Run 1 — Baseline ([`60a5891`](../../commit/60a5891))
 | Metric | Value |
@@ -72,6 +74,19 @@ Push requests per second and concurrent users as high as possible for a scenario
 **Bottleneck:** Under extreme load, the async thread pool (50 threads) and queue (20,000) saturate. With queue being full, `AbortPolicy` throws `TaskRejectedException`, killing the STOMP broadcast for that message.
 
 [Results](load-test-runs/run-4-c19c271/req-results.png) | [Req/sec](load-test-runs/run-4-c19c271/req-per-sec.png) | [Bottleneck](load-test-runs/run-4-c19c271/bottleneck.png)
+
+---
+
+### Run 5 — Kafka + batched WebSocket broadcasts ([`06e2670`](../../commit/06e2670))
+| Metric | Value |
+|---|---|
+| Concurrent users | 10,000 |
+| Success rate | 91.7% |
+| Peak req/sec | ~11,628 |
+
+**Bottleneck:** 10k users trigger `findByCognitoId` DB lookups simultaneously through `JwtUserProvisioningFilter` to provision the user, which overwhelms the 50 HikariCP connections.
+
+[Results](load-test-runs/run-5-06e2670/req-result.png) | [Req/sec](load-test-runs/run-5-06e2670/req-per-sec.png) | [Bottleneck](load-test-runs/run-5-06e2670/bottleneck.png)
 
 ## Getting Started
 
