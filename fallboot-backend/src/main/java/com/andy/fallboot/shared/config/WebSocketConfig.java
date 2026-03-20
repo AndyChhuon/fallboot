@@ -1,6 +1,7 @@
 package com.andy.fallboot.shared.config;
 
 import com.andy.fallboot.shared.config.interceptor.StompAuthChannelInterceptor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -15,14 +16,29 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
 
-    public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor) {
+    private final String relayHost;
+    private final int relayPort;
+    private final String relayUsername;
+    private final String relayPassword;
+
+    public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor,
+                           @Value("${spring.rabbitmq.host}") String relayHost,
+                           @Value("${spring.rabbitmq.port}") int relayPort,
+                           @Value("${spring.rabbitmq.username}") String relayUsername,
+                           @Value("${spring.rabbitmq.password}") String relayPassword) {
         this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
+        this.relayHost = relayHost;
+        this.relayPort = relayPort;
+        this.relayUsername = relayUsername;
+        this.relayPassword = relayPassword;
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic");
+        config.enableStompBrokerRelay("/topic").setRelayHost(relayHost).setRelayPort(relayPort).setVirtualHost("/")
+                .setClientLogin(relayUsername).setClientPasscode(relayPassword).setSystemLogin(relayUsername).setSystemPasscode(relayPassword);
         config.setApplicationDestinationPrefixes("/app");
+
     }
 
     @Override
@@ -34,12 +50,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(stompAuthChannelInterceptor);
-        registration.taskExecutor().corePoolSize(20).maxPoolSize(50);
+        registration.taskExecutor().corePoolSize(50).maxPoolSize(200);
     }
 
     @Override
     public void configureClientOutboundChannel(ChannelRegistration registration) {
-        registration.taskExecutor().corePoolSize(20).maxPoolSize(50);
+        registration.taskExecutor().corePoolSize(50).maxPoolSize(200);
     }
 
 }

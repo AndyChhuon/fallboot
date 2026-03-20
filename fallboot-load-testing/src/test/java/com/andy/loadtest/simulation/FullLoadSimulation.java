@@ -102,7 +102,7 @@ public class FullLoadSimulation extends Simulation {
             .exec(
                     ws("STOMP SUBSCRIBE")
                             .sendText(StompFrameHelper.subscribeFrame(
-                                    "/topic/room/" + LoadTestConfig.ROOM_ID, "sub-0"))
+                                    "/topic/room." + LoadTestConfig.ROOM_ID, "sub-0"))
             )
             .pause(1)
             .during(LoadTestConfig.DURATION_SECONDS).on(

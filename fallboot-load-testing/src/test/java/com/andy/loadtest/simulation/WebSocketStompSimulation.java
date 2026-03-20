@@ -85,7 +85,7 @@ public class WebSocketStompSimulation extends Simulation {
             .exec(
                     ws("STOMP SUBSCRIBE")
                             .sendText(StompFrameHelper.subscribeFrame(
-                                    "/topic/room/" + LoadTestConfig.ROOM_ID, "sub-0"))
+                                    "/topic/room." + LoadTestConfig.ROOM_ID, "sub-0"))
             )
             .pause(1)
             .during(LoadTestConfig.DURATION_SECONDS).on(
@@ -200,7 +200,7 @@ public class WebSocketStompSimulation extends Simulation {
             } else {
                 System.out.println("FAILURE: " + (mismatch + notFound) + " pixels failed verification");
             }
-            
+
             // Verify kafka properly saved in DB
             HttpRequest dbRequest = HttpRequest.newBuilder()
                     .uri(URI.create(LoadTestConfig.BASE_URL + "/api/pixels/room/test-verification/" + LoadTestConfig.ROOM_ID))

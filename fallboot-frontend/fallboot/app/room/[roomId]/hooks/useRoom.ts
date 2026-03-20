@@ -47,7 +47,7 @@ export function useRoom(
       connectHeaders: { Authorization: `Bearer ${accessToken}` },
       onConnect: () => {
         setConnected(true);
-        client.subscribe(`/topic/room/${roomId}`, (msg) => {
+        client.subscribe(`/topic/room.${roomId}`, (msg) => {
           const updates: Array<{ x: number; y: number; color: string; lastUpdatedBy: number | null }> = JSON.parse(msg.body);
           updates.forEach((data) => {
             const key = `${data.x},${data.y}`;
