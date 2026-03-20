@@ -36,3 +36,8 @@ spring:
       properties:
         linger.ms: 50
         batch.size: 65536
+  rabbitmq:
+    host: localhost
+    port: 61613
+    username: guest
+    password: guest

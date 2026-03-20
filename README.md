@@ -138,8 +138,10 @@ See [fallboot-load-testing/README.md](fallboot-load-testing/README.md) for more 
 ### 5. Clear the services
 ```bash
 docker exec fallboot-postgres-dev psql -U myUser -d fallboot -c "DELETE FROM pixel;"
+docker exec fallboot-postgres-dev psql -U myUser -d fallboot -c "INSERT INTO room (id, room_name) VALUES ('c55c81a0-806c-4108-b393-500d88851d88', 'default') ON CONFLICT DO NOTHING"
 docker exec fallboot-redis-1 redis-cli FLUSHALL
 docker exec fallboot-kafka-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic pixel-updates
+docker restart fallboot-rabbitmq-dev
 ```
 
 ### 6. Stop the services

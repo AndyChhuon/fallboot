@@ -4,7 +4,7 @@ spring:
     username: myUser
     password: password1234
     hikari:
-      maximum-pool-size: 50
+      maximum-pool-size: 5
   jpa:
     show-sql: false
   kafka:

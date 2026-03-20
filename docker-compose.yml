@@ -21,7 +21,16 @@ services:
     image: apache/kafka:latest
     ports:
       - "9092:9092"
-
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: fallboot-rabbitmq-dev
+    environment:
+      RABBITMQ_ENABLED_PLUGINS: "rabbitmq_stomp,rabbitmq_management"
+    ports:
+      - "15672:15672"
+      - "61613:61613"
+    command: >
+      bash -c "rabbitmq-plugins enable --offline rabbitmq_stomp rabbitmq_management && rabbitmq-server"
 volumes:
   postgres_data:
 
