@@ -38,3 +38,10 @@ CLAUDE.md
 
 ### Mac ####
 .DS_Store
+
+### Terraform ###
+*.tfvars
+!*.tfvars.example
+.terraform/
+*.tfstate
+*.tfstate.backup

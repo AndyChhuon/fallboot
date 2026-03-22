@@ -88,7 +88,7 @@ Push requests per second and concurrent users as high as possible for a scenario
 
 [Results](load-test-runs/run-5-06e2670/req-result.png) | [Req/sec](load-test-runs/run-5-06e2670/req-per-sec.png) | [Bottleneck](load-test-runs/run-5-06e2670/bottleneck.png)
 
-## Getting Started
+## Getting Started (Local)
 
 ### 1. Start dependencies
 
@@ -96,7 +96,7 @@ Push requests per second and concurrent users as high as possible for a scenario
 docker compose up -d
 ```
 
-This starts PostgreSQL 17 on `localhost:5432` and Redis on `localhost:6379`.
+This starts PostgreSQL 17, Redis, Kafka, and RabbitMQ locally.
 
 ### 2. Run the application
 
@@ -104,19 +104,19 @@ This starts PostgreSQL 17 on `localhost:5432` and Redis on `localhost:6379`.
 ./mvnw clean install
 
 # With Cognito auth
- ./mvnw spring-boot:run -pl fallboot-backend
- 
+./mvnw spring-boot:run -pl fallboot-backend
+
 # With mock JWT auth (dev/load testing — no Cognito needed)
- ./mvnw spring-boot:run -pl fallboot-backend -Dspring-boot.run.profiles=loadtest
- ```
+./mvnw spring-boot:run -pl fallboot-backend -Dspring-boot.run.profiles=loadtest
+```
 
 When using the `loadtest` profile, start a load test simulation first to run the mock JWKS server on port 9999. See `fallboot-load-testing/README.md` for details.
 
 ### 3. Run the kafka microservice
-```bash
 
+```bash
 ./mvnw spring-boot:run -pl fallboot-kafka -Dspring-boot.run.profiles=dev
- ```
+```
 
 ### 4. Run the load test
 
@@ -136,6 +136,7 @@ open target/gatling/*/index.html
 See [fallboot-load-testing/README.md](fallboot-load-testing/README.md) for more configuration options.
 
 ### 5. Clear the services
+
 ```bash
 docker exec fallboot-postgres-dev psql -U myUser -d fallboot -c "DELETE FROM pixel;"
 docker exec fallboot-postgres-dev psql -U myUser -d fallboot -c "INSERT INTO room (id, room_name) VALUES ('c55c81a0-806c-4108-b393-500d88851d88', 'default') ON CONFLICT DO NOTHING"
@@ -155,3 +156,88 @@ To wipe the database and start fresh:
 ```bash
 docker compose down -v
 ```
+
+---
+
+## Deploying to AWS
+
+### Prerequisites
+
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed and configured (`aws configure sso`)
+- [Terraform](https://developer.hashicorp.com/terraform/install) installed
+- [Docker](https://docs.docker.com/get-docker/) installed
+- Copy `terraform/infra/terraform.tfvars.example` to `terraform/infra/terraform.tfvars` and set your RDS password
+
+### Infrastructure
+
+The Terraform config is split into two directories:
+
+- `terraform/persistent/` — ECR image repositories (kept alive between test runs)
+- `terraform/infra/` — everything else: VPC, ECS, RDS, ElastiCache, Amazon MQ, MSK, ALB (destroyed after testing to save cost)
+
+### 1. Create ECR repositories (one-time)
+
+```bash
+cd terraform/persistent
+terraform init
+terraform apply
+```
+
+Note the ECR URLs from the output.
+
+### 2. Build and push Docker images
+
+```bash
+./scripts/push-images.sh
+```
+
+This reads the ECR URLs from the persistent Terraform state, builds both images, and pushes them.
+
+### 3. Deploy infrastructure
+
+```bash
+cd terraform/infra
+terraform init
+terraform apply
+```
+
+Takes ~15-20 minutes. Outputs the ALB URL when done.
+
+### 4. Create the room
+
+RDS is publicly accessible for testing purposes, so connect directly from your machine:
+
+```bash
+psql -h $(cd terraform/infra && terraform output -raw rds_endpoint | cut -d: -f1) -U myUser -d fallboot -c "INSERT INTO room (id, room_name) VALUES ('c55c81a0-806c-4108-b393-500d88851d88', 'default') ON CONFLICT DO NOTHING;"
+```
+
+### 5. Run load test against AWS
+
+```bash
+cd fallboot-load-testing
+
+./mvnw gatling:test \
+  -Dgatling.simulationClass=com.andy.loadtest.simulation.FullLoadSimulation \
+  -DbaseUrl=http://<alb-dns-name> \
+  -DwsUrl=ws://<alb-dns-name> \
+  -DmockJwksUrl=http://<alb-dns-name>:9999 \
+  -Dusers=10000 \
+  -DrampSeconds=10 \
+  -DdurationSeconds=10
+```
+
+Replace `<alb-dns-name>` with the ALB URL from `terraform output`. The `-DmockJwksUrl` flag tells the load test to fetch JWT tokens from the deployed mock JWKS server (port 9999 on the same ALB) instead of running one locally.
+
+### 6. Scale backend instances
+
+```bash
+terraform apply -var="fallboot_backend_count=8"
+```
+
+### 7. Tear down
+
+```bash
+terraform destroy
+```
+
+This removes all infrastructure except ECR repos. Images are preserved for the next deploy.

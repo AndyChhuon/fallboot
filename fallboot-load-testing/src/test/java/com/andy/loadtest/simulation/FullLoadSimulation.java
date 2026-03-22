@@ -26,9 +26,11 @@ import static io.gatling.javaapi.http.HttpDsl.*;
 
 public class FullLoadSimulation extends Simulation {
 
-    private final JwtTokenGenerator tokenGenerator = new JwtTokenGenerator();
-    private final MockJwksServer mockServer = new MockJwksServer(tokenGenerator);
+    private final boolean isRemoteMode = LoadTestConfig.MOCK_JWKS_URL != null;
+    private final JwtTokenGenerator tokenGenerator = isRemoteMode ? null : new JwtTokenGenerator();
+    private final MockJwksServer mockServer = isRemoteMode ? null : new MockJwksServer(tokenGenerator);
     private final AtomicInteger userCounter = new AtomicInteger(0);
+    private final ConcurrentHashMap<Integer, String> remoteTokens = new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, String> lastPixelColor = new ConcurrentHashMap<>();
 
@@ -37,10 +39,17 @@ public class FullLoadSimulation extends Simulation {
             "#FF00FF", "#00FFFF", "#000000", "#FFFFFF"
     };
 
+    private String getToken(int idx) {
+        if (isRemoteMode) {
+            return remoteTokens.get(idx);
+        }
+        return tokenGenerator.generateToken(idx);
+    }
+
     private final Supplier<Map<String, Object>> feederSupplier = () -> {
         int idx = userCounter.getAndIncrement();
         return Map.of(
-                "token", tokenGenerator.generateToken(idx),
+                "token", getToken(idx),
                 "userIndex", idx
         );
     };
@@ -139,11 +148,51 @@ public class FullLoadSimulation extends Simulation {
                 );
     }
 
+    private void prefetchRemoteTokens() {
+        int count = LoadTestConfig.USERS;
+        int batchSize = 500;
+        System.out.println("Fetching " + count + " tokens in batches of " + batchSize + " from " + LoadTestConfig.MOCK_JWKS_URL);
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(java.time.Duration.ofSeconds(10))
+                .build();
+        for (int batch = 0; batch < count; batch += batchSize) {
+            int batchCount = Math.min(batchSize, count - batch);
+            try {
+                HttpResponse<String> resp = client.send(
+                        HttpRequest.newBuilder()
+                                .uri(URI.create(LoadTestConfig.MOCK_JWKS_URL + "/tokens?start=" + batch + "&count=" + batchCount))
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString()
+                );
+                if (resp.statusCode() == 200) {
+                    String[] tokens = resp.body().strip().split("\\R");
+                    for (int i = 0; i < tokens.length; i++) {
+                        if (!tokens[i].isBlank()) {
+                            remoteTokens.put(batch + i, tokens[i].strip());
+                        }
+                    }
+                } else {
+                    System.err.println("Batch fetch failed at " + batch + ": HTTP " + resp.statusCode());
+                }
+            } catch (Exception e) {
+                System.err.println("Batch fetch error at " + batch + ": " + e.getMessage());
+            }
+            System.out.println("Prefetched " + remoteTokens.size() + "/" + count + " tokens");
+        }
+    }
+
     @Override
     public void before() {
-        mockServer.start();
-        System.out.println("Mock JWKS server started on port 9999");
-        System.out.println("Token endpoint: http://localhost:9999/token?userIndex=0");
+        if (isRemoteMode) {
+            System.out.println("Remote mode: using mock JWKS server at " + LoadTestConfig.MOCK_JWKS_URL);
+            prefetchRemoteTokens();
+        } else {
+            mockServer.start();
+            System.out.println("Mock JWKS server started on port 9999");
+            System.out.println("Token endpoint: http://localhost:9999/token?userIndex=0");
+        }
         System.out.println("Press Enter to start the simulation...");
         try {
             System.in.read();
@@ -153,14 +202,16 @@ public class FullLoadSimulation extends Simulation {
 
     @Override
     public void after() {
-        mockServer.stop();
+        if (!isRemoteMode) {
+            mockServer.stop();
+        }
         System.out.println("Mock JWKS server stopped");
 
         System.out.println("Press Enter to evaluate after Kafka is done processing...");
         new Scanner(System.in).nextLine();
 
         // Fetch final pixel state from server and verify every sent pixel (likely hits caffeine/redis)
-        String token = tokenGenerator.generateToken(0);
+        String token = getToken(0);
         try (HttpClient client = HttpClient.newHttpClient()) {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(LoadTestConfig.BASE_URL + "/api/pixels/room/" + LoadTestConfig.ROOM_ID))
