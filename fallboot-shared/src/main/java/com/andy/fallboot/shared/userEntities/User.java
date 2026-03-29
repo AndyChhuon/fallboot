@@ -6,10 +6,6 @@ import jakarta.persistence.*;
 @Table(name = "users")
 public class User {
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
-    private Long id;
-
-    @Column(unique = true, nullable = false)
     private String cognitoId;
 
     @Column(unique = true, nullable = false)
@@ -21,13 +17,9 @@ public class User {
     protected User() {}
 
     public User(String cognitoId, String email, String name) {
-        this.email = email;
         this.cognitoId = cognitoId;
+        this.email = email;
         this.name = name;
-    }
-
-    public Long getId(){
-        return id;
     }
 
     public String getCognitoId() {

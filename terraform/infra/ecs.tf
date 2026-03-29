@@ -1,4 +1,3 @@
-# Look up ECR repos from persistent stack
 data "aws_ecr_repository" "backend" {
   name = "fallboot-backend"
 }
@@ -17,7 +16,6 @@ resource "aws_ecs_cluster" "main" {
   tags = { Name = "fallboot-cluster" }
 }
 
-# Let ECS tasks pull images from ECR and write logs
 resource "aws_iam_role" "ecs_task_execution" {
   name = "fallboot-ecs-execution-role"
 
@@ -36,7 +34,6 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# CloudWatch log groups for container logs
 resource "aws_cloudwatch_log_group" "backend" {
   name              = "/ecs/fallboot-backend"
   retention_in_days = 7
@@ -55,8 +52,8 @@ resource "aws_ecs_task_definition" "backend" {
   family                   = "fallboot-backend"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "2048"  # 2 vCPU
-  memory                   = "4096"  # 4 GB RAM
+  cpu                      = "4096"
+  memory                   = "8192"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
 
   container_definitions = jsonencode([{
@@ -75,10 +72,6 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "SPRING_DATASOURCE_PASSWORD",     value = var.db_password },
       { name = "SPRING_DATA_REDIS_HOST",         value = aws_elasticache_cluster.redis.cache_nodes[0].address },
       { name = "SPRING_DATA_REDIS_PORT",         value = "6379" },
-      { name = "SPRING_RABBITMQ_HOST",           value = aws_instance.rabbitmq.private_ip },
-      { name = "SPRING_RABBITMQ_PORT",           value = "61613" },
-      { name = "SPRING_RABBITMQ_USERNAME",       value = var.rabbitmq_username },
-      { name = "SPRING_RABBITMQ_PASSWORD",       value = var.db_password },
       { name = "SPRING_KAFKA_BOOTSTRAP_SERVERS", value = aws_msk_cluster.kafka.bootstrap_brokers_tls },
       { name = "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI", value = "http://mock-jwks.fallboot.local:9999" },
       { name = "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI", value = "http://mock-jwks.fallboot.local:9999/.well-known/jwks.json" },
@@ -101,8 +94,8 @@ resource "aws_ecs_task_definition" "kafka" {
   family                   = "fallboot-kafka"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"  # 0.5 vCPU
-  memory                   = "1024" # 1 GB RAM
+  cpu                      = "512"
+  memory                   = "1024"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
 
   container_definitions = jsonencode([{
@@ -130,7 +123,6 @@ resource "aws_ecs_task_definition" "kafka" {
   tags = { Name = "fallboot-kafka" }
 }
 
-# Backend ECS service
 resource "aws_ecs_service" "backend" {
   name            = "fallboot-backend"
   cluster         = aws_ecs_cluster.main.id
@@ -152,7 +144,6 @@ resource "aws_ecs_service" "backend" {
   tags = { Name = "fallboot-backend" }
 }
 
-# Kafka consumer ECS service
 resource "aws_ecs_service" "kafka" {
   name            = "fallboot-kafka"
   cluster         = aws_ecs_cluster.main.id
@@ -168,7 +159,6 @@ resource "aws_ecs_service" "kafka" {
   tags = { Name = "fallboot-kafka" }
 }
 
-# Mock JWKS server log group
 resource "aws_cloudwatch_log_group" "mock_jwks" {
   name              = "/ecs/fallboot-mock-jwks"
   retention_in_days = 7
@@ -176,13 +166,12 @@ resource "aws_cloudwatch_log_group" "mock_jwks" {
   tags = { Name = "fallboot-mock-jwks-logs" }
 }
 
-# Mock JWKS server task definition
 resource "aws_ecs_task_definition" "mock_jwks" {
   family                   = "fallboot-mock-jwks"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"   # 0.25 vCPU
-  memory                   = "512"   # 0.5 GB RAM
+  cpu                      = "256"
+  memory                   = "512"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
 
   container_definitions = jsonencode([{
@@ -213,12 +202,11 @@ resource "aws_ecs_task_definition" "mock_jwks" {
   tags = { Name = "fallboot-mock-jwks" }
 }
 
-# Mock JWKS ECS service with service discovery + ALB
 resource "aws_ecs_service" "mock_jwks" {
   name            = "fallboot-mock-jwks"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.mock_jwks.arn
-  desired_count   = 1
+  desired_count   = 2
   launch_type     = "FARGATE"
 
   network_configuration {

@@ -1,7 +1,6 @@
 package com.andy.fallboot.shared.config.interceptor;
 
-import com.andy.fallboot.shared.userEntities.UserDTO;
-import com.andy.fallboot.user.UserService;
+import com.andy.fallboot.pixel.component.BroadcastSessionManager;
 import org.jspecify.annotations.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -18,34 +17,34 @@ import org.springframework.stereotype.Component;
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private final JwtDecoder jwtDecoder;
-    private final UserService userService;
+    private final BroadcastSessionManager broadcastSessionManager;
 
-    public StompAuthChannelInterceptor(JwtDecoder jwtDecoder, UserService userService) {
+    public StompAuthChannelInterceptor(JwtDecoder jwtDecoder, BroadcastSessionManager broadcastSessionManager) {
         this.jwtDecoder = jwtDecoder;
-        this.userService = userService;
+        this.broadcastSessionManager = broadcastSessionManager;
     }
 
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (accessor == null) return message;
 
-        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String authHeader = accessor.getFirstNativeHeader("Authorization");
-
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                Jwt jwt = jwtDecoder.decode(token);
-
-                String cognitoId = jwt.getClaimAsString("sub");
-                String email = jwt.getClaimAsString("email");
-                String name = jwt.getClaimAsString("given_name");
-
-                UserDTO user = userService.findOrCreateUser(cognitoId, email, name);
-
-                accessor.setUser(new StompPrincipal(user.id().toString()));
+                Jwt jwt = jwtDecoder.decode(authHeader.substring(7));
+                accessor.setUser(new StompPrincipal(jwt.getClaimAsString("sub")));
             } else {
                 throw new MessagingException("Missing or invalid Authorization header");
             }
+        }
+
+        if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            broadcastSessionManager.markReady(accessor.getSessionId());
+        }
+
+        if (StompCommand.DISCONNECT.equals(accessor.getCommand())) {
+            broadcastSessionManager.unregister(accessor.getSessionId());
         }
 
         return message;

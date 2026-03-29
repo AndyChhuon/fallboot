@@ -14,13 +14,13 @@ import java.util.UUID;
 public interface PixelRepository extends JpaRepository<Pixel, PixelId> {
     @Modifying
     @Query(value = """
-      INSERT INTO pixel (room_id, x, y, color, last_updated_by_id)
-      VALUES (:roomId, :x, :y, :color, :userId)
-      ON CONFLICT (room_id, x, y) DO UPDATE SET color = :color, last_updated_by_id = :userId
+      INSERT INTO pixel (room_id, x, y, color, last_updated_by)
+      VALUES (:roomId, :x, :y, :color, :cognitoId)
+      ON CONFLICT (room_id, x, y) DO UPDATE SET color = :color, last_updated_by = :cognitoId
       """, nativeQuery = true)
     void upsertPixel(@Param("roomId") UUID roomId,
                      @Param("x") int x,
                      @Param("y") int y,
                      @Param("color") String color,
-                     @Param("userId") Long userId);
+                     @Param("cognitoId") String cognitoId);
 }

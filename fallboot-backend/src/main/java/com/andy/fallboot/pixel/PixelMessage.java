@@ -4,7 +4,7 @@ public class PixelMessage {
     private String color;
     private int x;
     private int y;
-    private Long lastUpdatedBy;
+    private String lastUpdatedBy;
 
     public PixelMessage() {}
 
@@ -26,11 +26,11 @@ public class PixelMessage {
         return y;
     }
 
-    public Long getLastUpdatedBy() {
+    public String getLastUpdatedBy() {
         return lastUpdatedBy;
     }
 
-    public void setLastUpdatedBy(Long lastUpdatedBy) {
+    public void setLastUpdatedBy(String lastUpdatedBy) {
         this.lastUpdatedBy = lastUpdatedBy;
     }
 }

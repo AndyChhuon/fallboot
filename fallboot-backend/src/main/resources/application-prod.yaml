@@ -4,11 +4,21 @@ server:
     min-response-size: 1024
   tomcat:
     threads:
-      max: 400
+      max: 100000
+    accept-count: 10000
+    max-connections: 100000
+#  tomcat:
+#    threads:
+#      max: 20000
+#    accept-count: 5000
+#    max-connections: 30000
 spring:
+  threads:
+    virtual:
+      enabled: true
   datasource:
     hikari:
-      maximum-pool-size: 50
+      maximum-pool-size: 10
   data:
     redis:
       lettuce:
@@ -35,5 +45,6 @@ spring:
         linger.ms: 50
         batch.size: 65536
         security.protocol: SSL
-  rabbitmq:
-    ssl: false
+logging:
+  level:
+    org.springframework.security.oauth2: WARN

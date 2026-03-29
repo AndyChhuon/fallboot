@@ -10,7 +10,7 @@ resource "aws_msk_configuration" "kafka" {
 resource "aws_msk_cluster" "kafka" {
   cluster_name           = "fallboot-kafka"
   kafka_version          = "3.7.x.kraft"
-  number_of_broker_nodes = 2
+  number_of_broker_nodes = 3
 
   configuration_info {
     arn      = aws_msk_configuration.kafka.arn
@@ -24,7 +24,7 @@ resource "aws_msk_cluster" "kafka" {
 
     storage_info {
       ebs_storage_info {
-        volume_size = 20 # GB per broker
+        volume_size = 20
       }
     }
   }

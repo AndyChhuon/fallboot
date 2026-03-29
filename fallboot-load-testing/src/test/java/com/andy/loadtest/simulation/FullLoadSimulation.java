@@ -58,7 +58,8 @@ public class FullLoadSimulation extends Simulation {
             .baseUrl(LoadTestConfig.BASE_URL)
             .wsBaseUrl(LoadTestConfig.WS_URL)
             .acceptHeader("application/json")
-            .contentTypeHeader("application/json");
+            .contentTypeHeader("application/json")
+            .shareConnections();
 
     private Map<String, Object> randomPixelData() {
         int x = ThreadLocalRandom.current().nextInt(0, 1000);
@@ -152,32 +153,30 @@ public class FullLoadSimulation extends Simulation {
         int count = LoadTestConfig.USERS;
         int batchSize = 500;
         System.out.println("Fetching " + count + " tokens in batches of " + batchSize + " from " + LoadTestConfig.MOCK_JWKS_URL);
-        HttpClient client = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(java.time.Duration.ofSeconds(10))
-                .build();
         for (int batch = 0; batch < count; batch += batchSize) {
             int batchCount = Math.min(batchSize, count - batch);
-            try {
-                HttpResponse<String> resp = client.send(
-                        HttpRequest.newBuilder()
-                                .uri(URI.create(LoadTestConfig.MOCK_JWKS_URL + "/tokens?start=" + batch + "&count=" + batchCount))
-                                .GET()
-                                .build(),
-                        HttpResponse.BodyHandlers.ofString()
-                );
-                if (resp.statusCode() == 200) {
-                    String[] tokens = resp.body().strip().split("\\R");
-                    for (int i = 0; i < tokens.length; i++) {
-                        if (!tokens[i].isBlank()) {
-                            remoteTokens.put(batch + i, tokens[i].strip());
+            for (int retry = 0; retry < 5 && !remoteTokens.containsKey(batch); retry++) {
+                try {
+                    var url = new java.net.URL(LoadTestConfig.MOCK_JWKS_URL + "/tokens?start=" + batch + "&count=" + batchCount);
+                    var conn = (java.net.HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(3000);
+                    conn.setReadTimeout(30000);
+                    if (conn.getResponseCode() == 200) {
+                        String body = new String(conn.getInputStream().readAllBytes());
+                        String[] tokens = body.strip().split("\\R");
+                        for (int i = 0; i < tokens.length; i++) {
+                            if (!tokens[i].isBlank()) {
+                                remoteTokens.put(batch + i, tokens[i].strip());
+                            }
                         }
                     }
-                } else {
-                    System.err.println("Batch fetch failed at " + batch + ": HTTP " + resp.statusCode());
+                    conn.disconnect();
+                } catch (Exception e) {
+                    if (retry == 4) {
+                        System.err.println("Batch fetch failed at " + batch + ": " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                        e.printStackTrace();
+                    }
                 }
-            } catch (Exception e) {
-                System.err.println("Batch fetch error at " + batch + ": " + e.getMessage());
             }
             System.out.println("Prefetched " + remoteTokens.size() + "/" + count + " tokens");
         }

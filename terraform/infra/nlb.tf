@@ -1,33 +1,30 @@
 resource "aws_lb" "main" {
-  name               = "fallboot-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.public[*].id
+  name                       = "fallboot-nlb"
+  internal                   = false
+  load_balancer_type         = "network"
+  subnets                    = aws_subnet.public[*].id
+  enable_cross_zone_load_balancing = true
 
-  tags = { Name = "fallboot-alb" }
+  tags = { Name = "fallboot-nlb" }
 }
 
 resource "aws_lb_target_group" "backend" {
   name        = "fallboot-backend-tg"
   port        = 8080
-  protocol    = "HTTP"
+  protocol    = "TCP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
 
   health_check {
-    path                = "/public/test"
+    protocol            = "TCP"
     interval            = 30
-    timeout             = 5
     healthy_threshold   = 2
-    unhealthy_threshold = 3
+    unhealthy_threshold = 2
   }
 
-  # Sticky sessions, keep WebSocket user on the same backend instance
   stickiness {
-    type            = "lb_cookie"
-    cookie_duration = 86400 # 24 hours
-    enabled         = true
+    type    = "source_ip"
+    enabled = true
   }
 
   tags = { Name = "fallboot-backend-tg" }
@@ -36,7 +33,7 @@ resource "aws_lb_target_group" "backend" {
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
-  protocol          = "HTTP"
+  protocol          = "TCP"
 
   default_action {
     type             = "forward"
@@ -44,30 +41,27 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# Mock JWKS server target group
 resource "aws_lb_target_group" "mock_jwks" {
   name        = "fallboot-mock-jwks-tg"
   port        = 9999
-  protocol    = "HTTP"
+  protocol    = "TCP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
 
   health_check {
-    path                = "/.well-known/jwks.json"
+    protocol            = "TCP"
     interval            = 30
-    timeout             = 5
     healthy_threshold   = 2
-    unhealthy_threshold = 3
+    unhealthy_threshold = 2
   }
 
   tags = { Name = "fallboot-mock-jwks-tg" }
 }
 
-# Mock JWKS listener on port 9999
 resource "aws_lb_listener" "mock_jwks" {
   load_balancer_arn = aws_lb.main.arn
-  port              = 9999
-  protocol          = "HTTP"
+  port              = 443
+  protocol          = "TCP"
 
   default_action {
     type             = "forward"

@@ -18,6 +18,9 @@ public class UserService {
     }
 
     public UserDTO findOrCreateUser(String cognitoId, String email, String name){
-        return localCache.get(cognitoId, _ -> UserDTO.toUserDTO(userRepository.findByCognitoId(cognitoId).orElseGet(() -> userRepository.save(new User(cognitoId, email, name)))));
+        return localCache.get(cognitoId, _ -> UserDTO.toUserDTO(
+                userRepository.findById(cognitoId)
+                        .orElseGet(() -> userRepository.save(new User(cognitoId, email, name)))
+        ));
     }
 }

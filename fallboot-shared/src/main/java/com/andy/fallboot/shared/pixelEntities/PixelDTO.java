@@ -2,15 +2,15 @@ package com.andy.fallboot.shared.pixelEntities;
 
 import com.andy.fallboot.shared.userEntities.User;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public record PixelDTO(UUID roomUuid, int x, int y, String color, Long lastUpdatedBy) {
+public record PixelDTO(UUID roomUuid, int x, int y, String color, String lastUpdatedBy) {
     public static PixelDTO toPixelDTO(Pixel pixel){
-        return new PixelDTO(pixel.getRoom().getId(), pixel.getX(), pixel.getY(), pixel.getColor(), Optional.ofNullable(pixel.getLastUpdatedBy()).map(User::getId).orElse(null));
+        return new PixelDTO(pixel.getRoom().getId(), pixel.getX(), pixel.getY(), pixel.getColor(),
+                Optional.ofNullable(pixel.getLastUpdatedBy()).map(User::getCognitoId).orElse(null));
     }
 
     public static RoomPixelsResponseDTO toRoomPixelsResponseDTO(UUID roomID, Map<String, PixelDTO> pixelsMap) {
