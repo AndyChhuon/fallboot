@@ -13,26 +13,27 @@ Push requests per second and concurrent users as high as possible for a scenario
 ## Tech Stack
 
 - Java 25 / Spring Boot 4.0.2 / Maven
-- PostgreSQL 17 (persistence)
+- PostgreSQL 17
 - Redis (distributed cache + cross-instance Pub/Sub broadcasting)
 - Caffeine (in-process cache)
-- Apache Kafka (async persistence of pixel writes)
-- STOMP over WebSocket (real-time messaging)
-- Virtual threads (Java 25)
+- Apache Kafka (async persistence of writes)
+- STOMP over WebSocket
+- Java virtual threads
 - Gatling (load testing)
 
 ### AWS Infrastructure
 
-- ECS Fargate (backend + Kafka consumer + mock JWKS server)
-- NLB (Network Load Balancer) across 3 AZs
+- Network Load Balancer across 3 AZs
 - RDS PostgreSQL, ElastiCache Redis, MSK Kafka
-- Cloud Map (internal service discovery)
-- Terraform (infrastructure as code)
+- EC2 (load test instance)
+- ECR (Docker image registry)
+- ECS Fargate (backend + Kafka consumer + mock JWKS server)
+- CloudWatch (container logging)
+- Terraform for AWS provisioning
 
 ## Load Test Runs
 
-**Peak:** 10,000 concurrent users | 91.7% success | ~11,628 req/sec  
-**Stable:** 5,000 concurrent users | 100% success | ~7,751 req/sec
+**Peak stability:** 10,000 concurrent users | 99.2% success | ~10,388 req/sec (AWS)
 
 ### Run 1 — Baseline ([`60a5891`](../../commit/60a5891))
 | Metric | Value |
@@ -40,6 +41,8 @@ Push requests per second and concurrent users as high as possible for a scenario
 | Concurrent users | 1,000 |
 | Success rate | 5.3%  |
 | Peak req/sec | ~502  |
+
+**What changed:** No caching, synchronous DB writes, single instance.
 
 **Bottleneck:** HikariCP connection pool exhaustion. Every request checked the PostgreSQL DB to provision the user on auth, leading to `Unable to acquire JDBC Connection, request timed out after 30000ms`. Under load, all connections were used and threads starved.
 
@@ -54,6 +57,8 @@ Push requests per second and concurrent users as high as possible for a scenario
 | Success rate | 5.1% |
 | Peak req/sec | ~421 |
 
+**What changed:** Added Redis as a distributed cache for user lookups and pixel data.
+
 **Bottleneck:** Lettuce (Redis client) thread contention. Redis handled caching, but under load the Lettuce threads themselves became blocked, stalling requests. Redis alone didn't move the needle.
 
 [Results](load-test-runs/run-2-b9a2d77/req-results.png) | [Req/sec](load-test-runs/run-2-b9a2d77/req-per-sec.png) | [Bottleneck](load-test-runs/run-2-b9a2d77/bottleneck.png)
@@ -66,6 +71,8 @@ Push requests per second and concurrent users as high as possible for a scenario
 | Concurrent users | 2,000 |
 | Success rate | 96.1% |
 | Peak req/sec | ~3,592 |
+
+**What changed:** Added Caffeine as an in-process cache in front of Redis. User lookups and pixel data served from JVM heap with zero network hops.
 
 **Bottleneck:** STOMP `clientInboundChannel` thread contention. With reads being fast, the write path became the bottleneck. Synchronous DB writes on the inbound channel threads blocked STOMP message handling and outbound broadcasts.
 
@@ -80,6 +87,8 @@ Push requests per second and concurrent users as high as possible for a scenario
 | Success rate | 99.5%  |
 | Peak req/sec | ~5,784 |
 
+**What changed:** Moved DB writes to an async thread pool so STOMP inbound threads aren't blocked waiting on PostgreSQL.
+
 **Bottleneck:** Under extreme load, the async thread pool (50 threads) and queue (20,000) saturate. With queue being full, `AbortPolicy` throws `TaskRejectedException`, killing the STOMP broadcast for that message.
 
 [Results](load-test-runs/run-4-c19c271/req-results.png) | [Req/sec](load-test-runs/run-4-c19c271/req-per-sec.png) | [Bottleneck](load-test-runs/run-4-c19c271/bottleneck.png)
@@ -93,9 +102,36 @@ Push requests per second and concurrent users as high as possible for a scenario
 | Success rate | 91.7% |
 | Peak req/sec | ~11,628 |
 
+**What changed:** Replaced async thread pool with Kafka for pixel persistence. Added batched WebSocket broadcasts `PixelBatchService` which flushes every 50ms instead of broadcasting per-pixel.
+
 **Bottleneck:** 10k users trigger `findByCognitoId` DB lookups simultaneously through `JwtUserProvisioningFilter` to provision the user, which overwhelms the 50 HikariCP connections.
 
 [Results](load-test-runs/run-5-06e2670/req-result.png) | [Req/sec](load-test-runs/run-5-06e2670/req-per-sec.png) | [Bottleneck](load-test-runs/run-5-06e2670/bottleneck.png)
+
+---
+
+### Run 6 — Scale to AWS: Redis Pub/Sub + direct WebSocket broadcasts ([`f3c2693`](../../commit/f3c2693))
+| Metric | Value   |
+|---|---------|
+| Concurrent users | 10,000  |
+| Success rate | 99.2%   |
+| Peak req/sec | ~10,388 |
+
+| AWS Resource | Spec |
+|---|---|
+| fallboot-backend | 12 × ECS Fargate (4 vCPU / 8 GB) |
+| fallboot-kafka | 1 × ECS Fargate (0.5 vCPU / 1 GB) |
+| Database | RDS db.t3.large (PostgreSQL 17) |
+| Cache | ElastiCache cache.t3.micro (Redis) |
+| Kafka brokers | MSK 3 × kafka.m5.large |
+| Load balancer | NLB across 3 AZs |
+| Load test | EC2 c5.4xlarge (16 vCPU / 32 GB) |
+
+**What changed:** Deployed to AWS with Terraform (ECS Fargate, NLB, RDS, ElastiCache, MSK). Replaced `messagingTemplate.convertAndSend()` with Redis Pub/Sub + `BroadcastSessionManager` that writes directly to WebSocket sessions, bypassing SimpleBroker's synchronized `DefaultSubscriptionRegistry`. Moved user provisioning off the hot path to Kafka (use `cognitoId` from JWT directly, no DB lookup). Switched from ALB to NLB for faster burst connection handling.
+
+**Bottleneck:** `DefaultSubscriptionRegistry` synchronized lock causes STOMP's platform threads to bottleneck during CONNECTED handshake. 572 users timed out waiting for STOMP CONNECTED.
+
+[Results](load-test-runs/run-6-f3c2693/req-result.png) | [Req/sec](load-test-runs/run-6-f3c2693/req-per-sec.png) | [Bottleneck](load-test-runs/run-6-f3c2693/bottleneck.png)
 
 ## Getting Started (Local)
 
