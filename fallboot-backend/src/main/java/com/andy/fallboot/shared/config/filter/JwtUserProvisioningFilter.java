@@ -1,13 +1,14 @@
 package com.andy.fallboot.shared.config.filter;
 
 import com.andy.fallboot.shared.userEntities.UserDTO;
-import com.andy.fallboot.user.UserService;
+import com.andy.fallboot.user.UserProvisioningProducer;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,12 +19,15 @@ import java.io.IOException;
 
 @Component
 public class JwtUserProvisioningFilter extends OncePerRequestFilter {
-    private final UserService userService;
+    private final UserProvisioningProducer userProvisioningProducer;
+    private final Cache<String, Boolean> provisionedUsers = Caffeine.newBuilder()
+            .maximumSize(1_000_000)
+            .build();
 
-    @Autowired
-    public JwtUserProvisioningFilter(UserService userService){
-        this.userService = userService;
+    public JwtUserProvisioningFilter(UserProvisioningProducer userProvisioningProducer) {
+        this.userProvisioningProducer = userProvisioningProducer;
     }
+
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain) throws ServletException, IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -35,8 +39,12 @@ public class JwtUserProvisioningFilter extends OncePerRequestFilter {
                 String email = jwt.getClaimAsString("email");
                 String name = jwt.getClaimAsString("given_name");
 
-                UserDTO user = userService.findOrCreateUser(cognitoId, email, name);
-                request.setAttribute("userId", user.id());
+                request.setAttribute("cognitoId", cognitoId);
+
+                provisionedUsers.get(cognitoId, _ -> {
+                    userProvisioningProducer.sendUserProvisioning(new UserDTO(cognitoId, email, name));
+                    return true;
+                });
             }
         }
 
@@ -45,6 +53,6 @@ public class JwtUserProvisioningFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/public");
+        return request.getRequestURI().startsWith("/public") || request.getRequestURI().startsWith("/actuator");
     }
 }

@@ -1,7 +1,50 @@
+server:
+  compression:
+    enabled: true
+    min-response-size: 1024
+  tomcat:
+    threads:
+      max: 100000
+    accept-count: 10000
+    max-connections: 100000
+#  tomcat:
+#    threads:
+#      max: 20000
+#    accept-count: 5000
+#    max-connections: 30000
 spring:
+  threads:
+    virtual:
+      enabled: true
   datasource:
-    url:
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+  data:
+    redis:
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 50
+          max-idle: 20
+          min-idle: 5
   jpa:
     show-sql: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://mock-jwks.fallboot.local:9999
+          jwk-set-uri: http://mock-jwks.fallboot.local:9999/.well-known/jwks.json
+  kafka:
+    topic:
+      name: pixel-updates
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        linger.ms: 50
+        batch.size: 65536
+        security.protocol: SSL
+logging:
+  level:
+    org.springframework.security.oauth2: WARN

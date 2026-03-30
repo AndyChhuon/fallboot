@@ -12,4 +12,6 @@ public final class LoadTestConfig {
     public static final String ROOM_ID = System.getProperty("roomId", "c55c81a0-806c-4108-b393-500d88851d88");
     public static final int DURATION_SECONDS = Integer.getInteger("durationSeconds", 30);
     public static final int PAUSE_MILLIS = Integer.getInteger("pauseMillis", 500);
+    // When set, fetches tokens from deployed mock JWKS server instead of generating locally
+    public static final String MOCK_JWKS_URL = System.getProperty("mockJwksUrl");
 }

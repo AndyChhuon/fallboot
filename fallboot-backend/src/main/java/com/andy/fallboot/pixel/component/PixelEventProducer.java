@@ -7,15 +7,15 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PixelEventProducer {
-    private final KafkaTemplate<String, PixelDTO> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final String kafkaTopicName;
 
-    public PixelEventProducer(@Value("${spring.kafka.topic.name}") String kafkaTopicName, KafkaTemplate<String, PixelDTO> kafkaTemplate) {
+    public PixelEventProducer(@Value("${spring.kafka.topic.name}") String kafkaTopicName, KafkaTemplate<String, Object> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
         this.kafkaTopicName = kafkaTopicName;
     }
 
     public void sendPixelUpdate(PixelDTO message) {
-        kafkaTemplate.send(kafkaTopicName, message.roomUuid() + ":" + message.x() + ":" + message.y(), message);
+        kafkaTemplate.send(kafkaTopicName, message.lastUpdatedBy(), message);
     }
 }

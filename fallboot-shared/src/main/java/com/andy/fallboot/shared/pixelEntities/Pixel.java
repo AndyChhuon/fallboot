@@ -20,6 +20,7 @@ public class Pixel {
     private String color;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "last_updated_by", referencedColumnName = "cognitoId")
     private User lastUpdatedBy;
 
     protected Pixel() {}

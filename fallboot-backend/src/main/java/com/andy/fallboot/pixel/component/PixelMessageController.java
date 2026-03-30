@@ -4,7 +4,6 @@ import com.andy.fallboot.pixel.PixelMessage;
 import com.andy.fallboot.shared.pixelEntities.RoomPixelsResponseDTO;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,11 +28,10 @@ public class PixelMessageController {
     public void updatePixelColor(
             @DestinationVariable("roomId") UUID roomId,
             PixelMessage message, Principal principal) {
-        Long userId = Long.parseLong(principal.getName());
-        log.debug("Pixel update: user={} room={} x={} y={} color={}", userId, roomId, message.getX(), message.getY(), message.getColor());
+        String cognitoId = principal.getName();
 
-        pixelService.cacheAndEmitPixelDTO(roomId, message.getX(), message.getY(), message.getColor(), userId);
-        message.setLastUpdatedBy(userId);
+        pixelService.cacheAndEmitPixelDTO(roomId, message.getX(), message.getY(), message.getColor(), cognitoId);
+        message.setLastUpdatedBy(cognitoId);
         pixelBatchService.addToBuffer(roomId, message);
     }
 

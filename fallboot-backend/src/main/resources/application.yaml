@@ -9,3 +9,8 @@ spring:
         format_sql: true
   profiles:
     active: dev
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,threaddump,metrics

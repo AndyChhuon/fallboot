@@ -2,11 +2,8 @@ package com.andy.fallboot.pixel.component;
 
 import com.andy.fallboot.pixel.PixelMessage;
 import com.andy.fallboot.shared.pixelEntities.PixelDTO;
-import org.springframework.context.ApplicationListener;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.messaging.simp.broker.BrokerAvailabilityEvent;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -19,14 +16,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 @Service
-public class PixelBatchService implements ApplicationListener<BrokerAvailabilityEvent> {
+public class PixelBatchService {
     private final ConcurrentHashMap<UUID, ConcurrentLinkedDeque<PixelMessage>> buffers = new ConcurrentHashMap<>();
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final HashOperations<String, String, PixelDTO> hashOps;
-    private volatile boolean brokerAvailable;
 
-    public PixelBatchService(SimpMessagingTemplate messagingTemplate, RedisTemplate<String, Object> redisTemplate) {
-        this.messagingTemplate = messagingTemplate;
+    public PixelBatchService(RedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
         this.hashOps = redisTemplate.opsForHash();
     }
 
@@ -34,33 +30,26 @@ public class PixelBatchService implements ApplicationListener<BrokerAvailability
         buffers.computeIfAbsent(roomId, _ -> new ConcurrentLinkedDeque<>()).add(message);
     }
 
-    @Override
-    public void onApplicationEvent(BrokerAvailabilityEvent event) {
-        this.brokerAvailable = event.isBrokerAvailable();
-    }
-
-
-    @Scheduled(fixedRate = 50)
+    @Scheduled(fixedRate = 100)
     public void flush() {
-        if (brokerAvailable) {
-            buffers.forEach((roomId, queue) -> {
-                List<PixelMessage> batch = new ArrayList<>();
-                PixelMessage msg;
-                while ((msg = queue.poll()) != null) {
-                    batch.add(msg);
+        buffers.forEach((roomId, queue) -> {
+            List<PixelMessage> batch = new ArrayList<>();
+            PixelMessage msg;
+            while ((msg = queue.poll()) != null) {
+                batch.add(msg);
+            }
+            if (!batch.isEmpty()) {
+                String roomKey = "room:" + roomId + ":pixels";
+                Map<String, PixelDTO> redisUpdates = new HashMap<>();
+                for (PixelMessage pixel : batch) {
+                    redisUpdates.put(pixel.getX() + ":" + pixel.getY(),
+                            new PixelDTO(roomId, pixel.getX(), pixel.getY(), pixel.getColor(), pixel.getLastUpdatedBy()));
                 }
-                if (!batch.isEmpty()) {
-                    String roomKey = "room:" + roomId + ":pixels";
-                    Map<String, PixelDTO> redisUpdates = new HashMap<>();
-                    for (PixelMessage pixel : batch) {
-                        redisUpdates.put(pixel.getX() + ":" + pixel.getY(),
-                                new PixelDTO(roomId, pixel.getX(), pixel.getY(), pixel.getColor(), pixel.getLastUpdatedBy()));
-                    }
-                    hashOps.putAll(roomKey, redisUpdates);
+                hashOps.putAll(roomKey, redisUpdates);
 
-                    messagingTemplate.convertAndSend("/topic/room." + roomId, batch);
-                }
-            });
-        }
+                // Publish to Redis Pub/Sub for cross-instance broadcasting
+                redisTemplate.convertAndSend("pixel-broadcast:" + roomId, batch);
+            }
+        });
     }
 }

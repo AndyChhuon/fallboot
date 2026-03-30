@@ -4,7 +4,7 @@ A real-time collaborative pixel canvas (r/Place like) built to scale under REST 
 
 ## Goal
 
-Push requests per second and concurrent users as high as possible for a scenario where a suddent burst of users each:
+Push requests per second and concurrent users as high as possible for a scenario where a sudden burst of users each:
 1. Fetch available rooms (`GET /api/rooms`)
 2. Fetch all pixels in a room (`GET /api/pixels/room/{roomId}`) to initialize the canvas (1000x1000)
 3. Connect via WebSocket (STOMP)
@@ -14,11 +14,20 @@ Push requests per second and concurrent users as high as possible for a scenario
 
 - Java 25 / Spring Boot 4.0.2 / Maven
 - PostgreSQL 17 (persistence)
-- Redis (distributed cache)
+- Redis (distributed cache + cross-instance Pub/Sub broadcasting)
 - Caffeine (in-process cache)
-- Apache Kafka (async processing of writes)
+- Apache Kafka (async persistence of pixel writes)
 - STOMP over WebSocket (real-time messaging)
+- Virtual threads (Java 25)
 - Gatling (load testing)
+
+### AWS Infrastructure
+
+- ECS Fargate (backend + Kafka consumer + mock JWKS server)
+- NLB (Network Load Balancer) across 3 AZs
+- RDS PostgreSQL, ElastiCache Redis, MSK Kafka
+- Cloud Map (internal service discovery)
+- Terraform (infrastructure as code)
 
 ## Load Test Runs
 
@@ -88,7 +97,7 @@ Push requests per second and concurrent users as high as possible for a scenario
 
 [Results](load-test-runs/run-5-06e2670/req-result.png) | [Req/sec](load-test-runs/run-5-06e2670/req-per-sec.png) | [Bottleneck](load-test-runs/run-5-06e2670/bottleneck.png)
 
-## Getting Started
+## Getting Started (Local)
 
 ### 1. Start dependencies
 
@@ -96,34 +105,29 @@ Push requests per second and concurrent users as high as possible for a scenario
 docker compose up -d
 ```
 
-This starts PostgreSQL 17 on `localhost:5432` and Redis on `localhost:6379`.
+This starts PostgreSQL 17, Redis, and Kafka locally.
 
 ### 2. Run the application
 
 ```bash
 ./mvnw clean install
 
-# With Cognito auth
- ./mvnw spring-boot:run -pl fallboot-backend
- 
-# With mock JWT auth (dev/load testing — no Cognito needed)
- ./mvnw spring-boot:run -pl fallboot-backend -Dspring-boot.run.profiles=loadtest
- ```
+./mvnw spring-boot:run -pl fallboot-backend -Dspring-boot.run.profiles=loadtest
+```
 
-When using the `loadtest` profile, start a load test simulation first to run the mock JWKS server on port 9999. See `fallboot-load-testing/README.md` for details.
+The `loadtest` profile uses the mock JWKS server (started by the load test) for JWT auth instead of AWS Cognito.
 
-### 3. Run the kafka microservice
+### 3. Run the Kafka consumer
+
 ```bash
-
 ./mvnw spring-boot:run -pl fallboot-kafka -Dspring-boot.run.profiles=dev
- ```
+```
 
 ### 4. Run the load test
 
 ```bash
 cd fallboot-load-testing
 
-# Full simulation: 2000 users, 10s ramp, 10s duration
 ./mvnw gatling:test -Dgatling.simulationClass=com.andy.loadtest.simulation.FullLoadSimulation -Dusers=2000 -DrampSeconds=10 -DdurationSeconds=10
 ```
 
@@ -133,18 +137,15 @@ Press Enter in the simulation terminal once the backend is ready. View the repor
 open target/gatling/*/index.html
 ```
 
-See [fallboot-load-testing/README.md](fallboot-load-testing/README.md) for more configuration options.
+### 5. Reset between runs
 
-### 5. Clear the services
 ```bash
-docker exec fallboot-postgres-dev psql -U myUser -d fallboot -c "DELETE FROM pixel;"
+docker exec fallboot-postgres-dev psql -U myUser -d fallboot -c "DELETE FROM pixel; DELETE FROM users;"
 docker exec fallboot-postgres-dev psql -U myUser -d fallboot -c "INSERT INTO room (id, room_name) VALUES ('c55c81a0-806c-4108-b393-500d88851d88', 'default') ON CONFLICT DO NOTHING"
 docker exec fallboot-redis-1 redis-cli FLUSHALL
-docker exec fallboot-kafka-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic pixel-updates
-docker restart fallboot-rabbitmq-dev
 ```
 
-### 6. Stop the services
+### 6. Stop services
 
 ```bash
 docker compose down
@@ -155,3 +156,145 @@ To wipe the database and start fresh:
 ```bash
 docker compose down -v
 ```
+
+---
+
+## Deploying to AWS
+
+### Prerequisites
+
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed
+- [Terraform](https://developer.hashicorp.com/terraform/install) installed
+- [Docker](https://docs.docker.com/get-docker/) installed
+
+### 1. Configure AWS SSO (one-time)
+
+```bash
+aws configure sso
+```
+
+When prompted, use your SSO start URL, select your account/role, set region to `us-east-2`, and name the profile `fallboot`.
+
+Login (repeat when session expires):
+
+```bash
+aws sso login --profile fallboot
+```
+
+### 2. Create ECR repositories (one-time)
+
+```bash
+cd terraform/persistent
+terraform init
+terraform apply
+```
+
+### 3. Create an SSH key pair for the load test EC2 (one-time)
+
+```bash
+aws ec2 create-key-pair --key-name fallboot-loadtest --profile fallboot --query 'KeyMaterial' --output text > ~/.ssh/fallboot-loadtest.pem && chmod 400 ~/.ssh/fallboot-loadtest.pem
+```
+
+### 4. Set your database password
+
+```bash
+cp terraform/infra/terraform.tfvars.example terraform/infra/terraform.tfvars
+```
+
+Edit `terraform/infra/terraform.tfvars` and set `db_password`. No spaces, `/`, `@`, `"`, `,`, `:`, or `=`.
+
+### 5. Build and push Docker images
+
+```bash
+./scripts/push-images.sh
+```
+
+Reads ECR URLs from Terraform state, builds all 3 images for `linux/amd64`, and pushes to ECR.
+
+### 6. Deploy infrastructure
+
+```bash
+cd terraform/infra
+terraform init
+terraform apply
+```
+
+Takes ~15-20 minutes (MSK + RDS). Outputs:
+- `nlb_url` — backend NLB URL
+- `mock_jwks_url` — mock JWKS server URL
+- `rds_endpoint` — PostgreSQL endpoint
+- `loadtest_ip` — EC2 instance IP for running Gatling
+
+### 7. Create the room
+
+```bash
+PGPASSWORD=<your-db-password> psql -h $(cd terraform/infra && terraform output -raw rds_endpoint | cut -d: -f1) -U myUser -d fallboot -c "INSERT INTO room (id, room_name) VALUES ('c55c81a0-806c-4108-b393-500d88851d88', 'default') ON CONFLICT DO NOTHING;"
+```
+
+### 8. Set up the load test EC2
+
+```bash
+tar czf /tmp/loadtest.tar.gz --exclude='target' --exclude='.idea' fallboot-load-testing/
+scp -i ~/.ssh/fallboot-loadtest.pem /tmp/loadtest.tar.gz ec2-user@$(cd terraform/infra && terraform output -raw loadtest_ip):~/
+ssh -i ~/.ssh/fallboot-loadtest.pem ec2-user@$(cd terraform/infra && terraform output -raw loadtest_ip)
+```
+
+On the EC2 instance:
+
+```bash
+tar xzf loadtest.tar.gz && chmod +x fallboot-load-testing/mvnw
+sudo yum install -y java-21-amazon-corretto-devel
+```
+
+### 9. Run load test from EC2
+
+Replace `<nlb-dns>` with the NLB URL from `terraform output -raw nlb_url` (without `http://`):
+
+```bash
+export MAVEN_OPTS="-Xmx16g -Xms8g"
+cd ~/fallboot-load-testing
+yes "" | ./mvnw gatling:test \
+  -Dgatling.simulationClass=com.andy.loadtest.simulation.FullLoadSimulation \
+  -DbaseUrl=http://<nlb-dns> \
+  -DwsUrl=ws://<nlb-dns> \
+  -DmockJwksUrl=http://<nlb-dns>:443 \
+  -Dusers=10000 \
+  -DrampSeconds=10 \
+  -DdurationSeconds=10
+```
+
+Copy the Gatling report to your machine to view:
+
+```bash
+scp -r -i ~/.ssh/fallboot-loadtest.pem ec2-user@<loadtest-ip>:~/fallboot-load-testing/target/gatling/<report-dir> /tmp/gatling-report && open /tmp/gatling-report/index.html
+```
+
+### 10. Reset between test runs
+
+```bash
+PGPASSWORD=<your-db-password> psql -h $(cd terraform/infra && terraform output -raw rds_endpoint | cut -d: -f1) -U myUser -d fallboot -c "DELETE FROM pixel; DELETE FROM users; INSERT INTO room (id, room_name) VALUES ('c55c81a0-806c-4108-b393-500d88851d88', 'default') ON CONFLICT DO NOTHING;"
+```
+
+### 11. Scale backend instances
+
+```bash
+cd terraform/infra
+terraform apply -var="fallboot_backend_count=20"
+```
+
+### 12. Monitor during tests
+
+```bash
+aws logs tail /ecs/fallboot-backend --follow --profile fallboot
+
+aws ecs describe-services --cluster fallboot-cluster --services fallboot-backend --profile fallboot --query 'services[0].{running:runningCount,desired:desiredCount}'
+```
+
+### 13. Tear down
+
+```bash
+cd terraform/infra
+terraform destroy
+```
+
+Removes all infrastructure except ECR repos. Images are preserved for the next deploy.
