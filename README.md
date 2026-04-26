@@ -2,45 +2,57 @@
 
 A real-time collaborative pixel canvas (r/Place like) built to scale under REST + WebSocket load.
 
+<p align="center">
+  <img src="load-test-runs/run-7-a112943/fallboot.gif" alt="Fallboot demo">
+</p>
+
 ## Goal
 
 Push requests per second and concurrent users as high as possible for a scenario where a sudden burst of users each:
+
 1. Fetch available rooms (`GET /api/rooms`)
 2. Fetch all pixels in a room (`GET /api/pixels/room/{roomId}`) to initialize the canvas (1000x1000)
-3. Connect via WebSocket (STOMP)
+3. Connect via WebSocket
 4. Send and receive real-time pixel updates
 
 ## Tech Stack
 
 - Java 25 / Spring Boot 4.0.2 / Maven
 - PostgreSQL 17
-- Redis (distributed cache + cross-instance Pub/Sub broadcasting)
-- Caffeine (in-process cache)
-- Apache Kafka (async persistence of writes)
-- STOMP over WebSocket
+- Redis
+- Caffeine
+- Apache Kafka
+- WebSocket
 - Java virtual threads
-- Gatling (load testing)
+- Gatling
 
 ### AWS Infrastructure
 
-- Network Load Balancer across 3 AZs
+- Network Load Balancer
 - RDS PostgreSQL, ElastiCache Redis, MSK Kafka
+- S3
+- CloudFront CDN
 - EC2 (load test instance)
-- ECR (Docker image registry)
+- ECR
 - ECS Fargate (backend + Kafka consumer + mock JWKS server)
-- CloudWatch (container logging)
+- CloudWatch
 - Terraform for AWS provisioning
 
 ## Load Test Runs
 
-**Peak stability:** 10,000 concurrent users | 99.2% success | ~10,388 req/sec (AWS)
+**Peak stability:** 25,000 concurrent users | 99.98% success | ~95,518 req/sec (AWS)
 
 ### Run 1 — Baseline ([`60a5891`](../../commit/60a5891))
-| Metric | Value |
-|---|-------|
+
+| Metric           | Value |
+| ---------------- | ----- |
 | Concurrent users | 1,000 |
-| Success rate | 5.3%  |
-| Peak req/sec | ~502  |
+| Success rate     | 5.3%  |
+| Peak req/sec     | ~502  |
+
+<p align="center">
+  <img src="load-test-runs/run-1-60a5891/architecture.png" alt="Architecture" width="800">
+</p>
 
 **What changed:** No caching, synchronous DB writes, single instance.
 
@@ -51,11 +63,16 @@ Push requests per second and concurrent users as high as possible for a scenario
 ---
 
 ### Run 2 — Redis cache ([`b9a2d77`](../../commit/b9a2d77))
-| Metric | Value |
-|---|---|
+
+| Metric           | Value |
+| ---------------- | ----- |
 | Concurrent users | 1,000 |
-| Success rate | 5.1% |
-| Peak req/sec | ~421 |
+| Success rate     | 5.1%  |
+| Peak req/sec     | ~421  |
+
+<p align="center">
+  <img src="load-test-runs/run-2-b9a2d77/architecture.png" alt="Architecture" width="800">
+</p>
 
 **What changed:** Added Redis as a distributed cache for user lookups and pixel data.
 
@@ -66,11 +83,16 @@ Push requests per second and concurrent users as high as possible for a scenario
 ---
 
 ### Run 3 — Caffeine in-process cache ([`f8db95b`](../../commit/f8db95b))
-| Metric | Value |
-|---|---|
-| Concurrent users | 2,000 |
-| Success rate | 96.1% |
-| Peak req/sec | ~3,592 |
+
+| Metric           | Value  |
+| ---------------- | ------ |
+| Concurrent users | 2,000  |
+| Success rate     | 96.1%  |
+| Peak req/sec     | ~3,592 |
+
+<p align="center">
+  <img src="load-test-runs/run-3-f8db95b/architecture.png" alt="Architecture" width="800">
+</p>
 
 **What changed:** Added Caffeine as an in-process cache in front of Redis. User lookups and pixel data served from JVM heap with zero network hops.
 
@@ -81,11 +103,16 @@ Push requests per second and concurrent users as high as possible for a scenario
 ---
 
 ### Run 4 — Async thread pool for persistence ([`c19c271`](../../commit/c19c271))
-| Metric | Value  |
-|---|--------|
+
+| Metric           | Value  |
+| ---------------- | ------ |
 | Concurrent users | 2,000  |
-| Success rate | 99.5%  |
-| Peak req/sec | ~5,784 |
+| Success rate     | 99.5%  |
+| Peak req/sec     | ~5,784 |
+
+<p align="center">
+  <img src="load-test-runs/run-4-c19c271/architecture.png" alt="Architecture" width="800">
+</p>
 
 **What changed:** Moved DB writes to an async thread pool so STOMP inbound threads aren't blocked waiting on PostgreSQL.
 
@@ -96,11 +123,16 @@ Push requests per second and concurrent users as high as possible for a scenario
 ---
 
 ### Run 5 — Kafka + batched WebSocket broadcasts ([`06e2670`](../../commit/06e2670))
-| Metric | Value |
-|---|---|
-| Concurrent users | 10,000 |
-| Success rate | 91.7% |
-| Peak req/sec | ~11,628 |
+
+| Metric           | Value   |
+| ---------------- | ------- |
+| Concurrent users | 10,000  |
+| Success rate     | 91.7%   |
+| Peak req/sec     | ~11,628 |
+
+<p align="center">
+  <img src="load-test-runs/run-5-06e2670/architecture.png" alt="Architecture" width="800">
+</p>
 
 **What changed:** Replaced async thread pool with Kafka for pixel persistence. Added batched WebSocket broadcasts `PixelBatchService` which flushes every 50ms instead of broadcasting per-pixel.
 
@@ -111,27 +143,63 @@ Push requests per second and concurrent users as high as possible for a scenario
 ---
 
 ### Run 6 — Scale to AWS: Redis Pub/Sub + direct WebSocket broadcasts ([`f3c2693`](../../commit/f3c2693))
-| Metric | Value   |
-|---|---------|
+
+| Metric           | Value   |
+| ---------------- | ------- |
 | Concurrent users | 10,000  |
-| Success rate | 99.2%   |
-| Peak req/sec | ~10,388 |
+| Success rate     | 99.2%   |
+| Peak req/sec     | ~10,388 |
 
-| AWS Resource | Spec |
-|---|---|
-| fallboot-backend | 12 × ECS Fargate (4 vCPU / 8 GB) |
-| fallboot-kafka | 1 × ECS Fargate (0.5 vCPU / 1 GB) |
-| Database | RDS db.t3.large (PostgreSQL 17) |
-| Cache | ElastiCache cache.t3.micro (Redis) |
-| Kafka brokers | MSK 3 × kafka.m5.large |
-| Load balancer | NLB across 3 AZs |
-| Load test | EC2 c5.4xlarge (16 vCPU / 32 GB) |
+| AWS Resource     | Spec                               |
+| ---------------- | ---------------------------------- |
+| fallboot-backend | 12 × ECS Fargate (4 vCPU / 8 GB)   |
+| fallboot-kafka   | 1 × ECS Fargate (0.5 vCPU / 1 GB)  |
+| Database         | RDS db.t3.large (PostgreSQL 17)    |
+| Cache            | ElastiCache cache.t3.micro (Redis) |
+| Kafka brokers    | MSK 3 × kafka.m5.large             |
+| Load balancer    | NLB across 3 AZs                   |
+| Load test        | EC2 c5.4xlarge (16 vCPU / 32 GB)   |
 
-**What changed:** Deployed to AWS with Terraform (ECS Fargate, NLB, RDS, ElastiCache, MSK). Replaced `messagingTemplate.convertAndSend()` with Redis Pub/Sub + `BroadcastSessionManager` that writes directly to WebSocket sessions, bypassing SimpleBroker's synchronized `DefaultSubscriptionRegistry`. Moved user provisioning off the hot path to Kafka (use `cognitoId` from JWT directly, no DB lookup). Switched from ALB to NLB for faster burst connection handling.
+<p align="center">
+  <img src="load-test-runs/run-6-f3c2693/architecture.png" alt="Architecture" width="800">
+</p>
+
+**What changed:** Deployed to AWS with Terraform (ECS Fargate, NLB, RDS, ElastiCache, MSK). Bypassed SimpleBroker's synchronized `DefaultSubscriptionRegistry` with Redis pub/sub and custom `BroadcastSessionManager`. Moved user provisioning off the hot path to Kafka.
 
 **Bottleneck:** `DefaultSubscriptionRegistry` synchronized lock causes STOMP's platform threads to bottleneck during CONNECTED handshake. 572 users timed out waiting for STOMP CONNECTED.
 
 [Results](load-test-runs/run-6-f3c2693/req-result.png) | [Req/sec](load-test-runs/run-6-f3c2693/req-per-sec.png) | [Bottleneck](load-test-runs/run-6-f3c2693/bottleneck.png)
+
+---
+
+### Run 7 — CDN snapshot architecture + replace STOMP ([`a112943`](../../commit/a112943))
+
+| Metric           | Value   |
+| ---------------- | ------- |
+| Concurrent users | 25,000  |
+| Success rate     | 99.98%  |
+| Peak req/sec     | ~95,518 |
+
+| AWS Resource     | Spec                                             |
+| ---------------- | ------------------------------------------------ |
+| fallboot-backend | 12 × ECS Fargate (4 vCPU / 8 GB)                 |
+| fallboot-kafka   | 1 × ECS Fargate (1 vCPU / 2 GB)                  |
+| Database         | RDS db.t3.large (PostgreSQL 17)                  |
+| Cache            | ElastiCache cache.t3.micro (Redis)               |
+| Kafka brokers    | MSK 3 × kafka.m5.large                           |
+| Load balancer    | NLB across 3 AZs                                 |
+| Snapshot storage | private S3 bucket                                |
+| CDN              | CloudFront (`?v=<seq>` as cache key)             |
+| IAM              | kafka-task role with `s3:PutObject` on `rooms/*` |
+| Load test        | EC2 c5.4xlarge (16 vCPU / 32 GB)                 |
+
+<p align="center">
+  <img src="load-test-runs/run-7-a112943/architecture.png" alt="Architecture" width="800">
+</p>
+
+**What changed:** Dropped STOMP for raw Websockets to avoid `DefaultSubscriptionRegistry` synchronized lock bottleneck. Kafka consumer keeps track of pixel changes and updates an S3 PNG representation of the entire 1000x1000 grid, cached via CDN. Backend sends a url back rather than individual pixel objects.
+
+[Results](load-test-runs/run-7-a112943/req-result.png) | [Req/sec](load-test-runs/run-7-a112943/req-per-sec.png)
 
 ## Getting Started (Local)
 
@@ -209,8 +277,6 @@ docker compose down -v
 aws configure sso
 ```
 
-When prompted, use your SSO start URL, select your account/role, set region to `us-east-2`, and name the profile `fallboot`.
-
 Login (repeat when session expires):
 
 ```bash
@@ -237,7 +303,7 @@ aws ec2 create-key-pair --key-name fallboot-loadtest --profile fallboot --query 
 cp terraform/infra/terraform.tfvars.example terraform/infra/terraform.tfvars
 ```
 
-Edit `terraform/infra/terraform.tfvars` and set `db_password`. No spaces, `/`, `@`, `"`, `,`, `:`, or `=`.
+Edit `terraform/infra/terraform.tfvars` and set `db_password`.
 
 ### 5. Build and push Docker images
 
@@ -255,11 +321,12 @@ terraform init
 terraform apply
 ```
 
-Takes ~15-20 minutes (MSK + RDS). Outputs:
-- `nlb_url` — backend NLB URL
-- `mock_jwks_url` — mock JWKS server URL
-- `rds_endpoint` — PostgreSQL endpoint
-- `loadtest_ip` — EC2 instance IP for running Gatling
+Outputs:
+
+- `nlb_url`: backend NLB URL
+- `mock_jwks_url`: mock JWKS server URL
+- `rds_endpoint`: PostgreSQL endpoint
+- `loadtest_ip`: EC2 instance IP for running Gatling
 
 ### 7. Create the room
 
@@ -332,5 +399,3 @@ aws ecs describe-services --cluster fallboot-cluster --services fallboot-backend
 cd terraform/infra
 terraform destroy
 ```
-
-Removes all infrastructure except ECR repos. Images are preserved for the next deploy.
