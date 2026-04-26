@@ -9,6 +9,9 @@ spring:
         format_sql: true
   profiles:
     active: dev
+fallboot:
+  cdn:
+    base-url: ${FALLBOOT_CDN_BASE_URL:http://localhost:9000/fallboot-snapshots}
 management:
   endpoints:
     web:

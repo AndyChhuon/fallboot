@@ -9,3 +9,13 @@ spring:
         format_sql: true
   profiles:
     active: dev
+fallboot:
+  cdn:
+    base-url: ${FALLBOOT_CDN_BASE_URL:http://localhost:9000/fallboot-snapshots}
+  snapshot:
+    flush-ms: 250
+aws:
+  region: ${AWS_REGION:us-east-2}
+  s3:
+    bucket: ${AWS_S3_BUCKET:fallboot-snapshots}
+    endpoint-override: ${AWS_S3_ENDPOINT:}

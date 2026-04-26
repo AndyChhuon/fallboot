@@ -17,3 +17,13 @@ output "loadtest_ip" {
   description = "Load test EC2 public IP (SSH with key pair)"
   value       = aws_instance.loadtest.public_ip
 }
+
+output "cdn_base_url" {
+  description = "CloudFront URL for pixel snapshots"
+  value       = "https://${aws_cloudfront_distribution.snapshots.domain_name}"
+}
+
+output "snapshots_bucket" {
+  description = "S3 bucket holding rendered pixel snapshots"
+  value       = aws_s3_bucket.snapshots.bucket
+}

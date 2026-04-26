@@ -5,6 +5,10 @@ spring:
     password: password1234
     hikari:
       maximum-pool-size: 5
+  data:
+    redis:
+      host: localhost
+      port: 6379
   jpa:
     show-sql: false
   kafka:

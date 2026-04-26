@@ -3,7 +3,6 @@ package com.andy.loadtest.simulation;
 import com.andy.loadtest.auth.JwtTokenGenerator;
 import com.andy.loadtest.auth.MockJwksServer;
 import com.andy.loadtest.config.LoadTestConfig;
-import com.andy.loadtest.util.StompFrameHelper;
 import io.gatling.javaapi.core.*;
 import io.gatling.javaapi.http.*;
 
@@ -93,26 +92,20 @@ public class FullLoadSimulation extends Simulation {
                             .check(status().is(200))
             )
             .pause(1)
-            // Connect WebSocket and send pixel updates
             .exec(
                     ws("Connect WebSocket").connect("/ws")
             )
-            .exec(session -> {
-                String token = session.getString("token");
-                return session.set("connectFrame", StompFrameHelper.connectFrame(token));
-            })
             .exec(
-                    ws("STOMP CONNECT")
-                            .sendText("#{connectFrame}")
+                    ws("Auth")
+                            .sendText(session -> "{\"type\":\"auth\",\"token\":\"" + session.getString("token") + "\"}")
                             .await(10).on(
-                                    ws.checkTextMessage("STOMP CONNECTED")
-                                            .check(regex("CONNECTED"))
+                                    ws.checkTextMessage("Authenticated")
+                                            .check(regex("authenticated"))
                             )
             )
             .exec(
-                    ws("STOMP SUBSCRIBE")
-                            .sendText(StompFrameHelper.subscribeFrame(
-                                    "/topic/room." + LoadTestConfig.ROOM_ID, "sub-0"))
+                    ws("Subscribe")
+                            .sendText("{\"type\":\"subscribe\",\"roomId\":\"" + LoadTestConfig.ROOM_ID + "\"}")
             )
             .pause(1)
             .during(LoadTestConfig.DURATION_SECONDS).on(
@@ -123,16 +116,16 @@ public class FullLoadSimulation extends Simulation {
                                 return session;
                             })
                             .exec(
-                                    ws("STOMP SEND pixel update")
+                                    ws("Send pixel update")
                                             .sendText(session ->
-                                                    StompFrameHelper.sendFrame(
-                                                            "/app/update-pixel/" + LoadTestConfig.ROOM_ID,
-                                                            session.getString("pixelPayload")
-                                                    )
+                                                    "{\"type\":\"pixel\",\"roomId\":\"" + LoadTestConfig.ROOM_ID +
+                                                    "\",\"x\":" + session.getString("expectedX") +
+                                                    ",\"y\":" + session.getString("expectedY") +
+                                                    ",\"color\":\"" + session.getString("expectedColor") + "\"}"
                                             )
-                                            .await(10).on(
-                                                    ws.checkTextMessage("Pixel broadcast received")
-                                                            .check(regex("\"x\":\\d+"))
+                                            .await(20).on(
+                                                    ws.checkTextMessage("Snapshot ping received")
+                                                            .check(regex("\"type\":\"snapshot\""))
                                             )
                             )
                             .pause(Duration.ofMillis(LoadTestConfig.PAUSE_MILLIS))
@@ -209,67 +202,12 @@ public class FullLoadSimulation extends Simulation {
         System.out.println("Press Enter to evaluate after Kafka is done processing...");
         new Scanner(System.in).nextLine();
 
-        // Fetch final pixel state from server and verify every sent pixel (likely hits caffeine/redis)
+        // Verify kafka properly saved pixels to DB (the snapshot REST endpoint now returns
+        // a CDN URL, not pixel data — so we verify exclusively against the DB endpoint)
         String token = getToken(0);
+        Pattern entryPattern = Pattern.compile("\"(\\d+):(\\d+)\":\"(#[0-9A-Fa-f]+)\"");
         try (HttpClient client = HttpClient.newHttpClient()) {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(LoadTestConfig.BASE_URL + "/api/pixels/room/" + LoadTestConfig.ROOM_ID))
-                    .header("Authorization", "Bearer " + token)
-                    .GET()
-                    .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
-                System.out.println("REST verification failed with status: " + response.statusCode());
-                return;
-            }
-
-            String body = response.body();
-            Pattern entryPattern = Pattern.compile("\"(\\d+):(\\d+)\":\"(#[0-9A-Fa-f]+)\"");
-            Matcher matcher = entryPattern.matcher(body);
-            Map<String, String> serverPixels = new ConcurrentHashMap<>();
-            while (matcher.find()) {
-                serverPixels.put(matcher.group(1) + ":" + matcher.group(2), matcher.group(3));
-            }
-
             int totalSent = lastPixelColor.size();
-            int verified = 0;
-            int mismatch = 0;
-            int notFound = 0;
-
-            for (Map.Entry<String, String> entry : lastPixelColor.entrySet()) {
-                String serverColor = serverPixels.get(entry.getKey());
-                if (serverColor == null) {
-                    notFound++;
-                    if (notFound <= 10) {
-                        System.out.println("[NOT FOUND] " + entry.getKey() + " expected=" + entry.getValue());
-                    }
-                } else if (!serverColor.equals(entry.getValue())) {
-                    mismatch++;
-                    if (mismatch <= 10) {
-                        System.out.println("[MISMATCH] " + entry.getKey() + " expected=" + entry.getValue() + " actual=" + serverColor);
-                    }
-                } else {
-                    verified++;
-                }
-            }
-
-            System.out.println("=== Pixel Verification via REST ===");
-            System.out.println("Unique coordinates sent: " + totalSent);
-            System.out.println("Server pixel count:      " + serverPixels.size());
-            System.out.println("Verified correct:        " + verified);
-            System.out.println("Color mismatch:          " + mismatch);
-            System.out.println("Not found on server:     " + notFound);
-            double pct = totalSent > 0 ? (verified * 100.0 / totalSent) : 0;
-            System.out.printf("Verification rate:       %.1f%%%n", pct);
-
-            if (mismatch == 0 && notFound == 0) {
-                System.out.println("SUCCESS: All " + totalSent + " pixels verified with correct values");
-            } else {
-                System.out.println("FAILURE: " + (mismatch + notFound) + " pixels failed verification");
-            }
-
-            // Verify kafka properly saved in DB
             HttpRequest dbRequest = HttpRequest.newBuilder()
                     .uri(URI.create(LoadTestConfig.BASE_URL + "/api/pixels/room/test-verification/" + LoadTestConfig.ROOM_ID))
                     .header("Authorization", "Bearer " + token)
