@@ -16,6 +16,6 @@ public class PixelEventProducer {
     }
 
     public void sendPixelUpdate(PixelDTO message) {
-        kafkaTemplate.send(kafkaTopicName, message.lastUpdatedBy(), message);
+        kafkaTemplate.send(kafkaTopicName, message.roomUuid().toString(), message);
     }
 }

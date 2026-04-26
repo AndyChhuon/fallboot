@@ -44,7 +44,7 @@ public class RedisConfig {
             PixelBroadcastSubscriber pixelBroadcastSubscriber) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(pixelBroadcastSubscriber, new PatternTopic("pixel-broadcast:*"));
+        container.addMessageListener(pixelBroadcastSubscriber, new PatternTopic("pixel-snapshot:*"));
         return container;
     }
 }

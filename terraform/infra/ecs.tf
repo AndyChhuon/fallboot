@@ -75,6 +75,7 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "SPRING_KAFKA_BOOTSTRAP_SERVERS", value = aws_msk_cluster.kafka.bootstrap_brokers_tls },
       { name = "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI", value = "http://mock-jwks.fallboot.local:9999" },
       { name = "SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI", value = "http://mock-jwks.fallboot.local:9999/.well-known/jwks.json" },
+      { name = "FALLBOOT_CDN_BASE_URL",          value = "https://${aws_cloudfront_distribution.snapshots.domain_name}" },
     ]
 
     logConfiguration = {
@@ -94,9 +95,10 @@ resource "aws_ecs_task_definition" "kafka" {
   family                   = "fallboot-kafka"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
+  cpu                      = "1024"
+  memory                   = "2048"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.kafka_task.arn
 
   container_definitions = jsonencode([{
     name      = "fallboot-kafka"
@@ -107,7 +109,12 @@ resource "aws_ecs_task_definition" "kafka" {
       { name = "SPRING_DATASOURCE_URL",          value = "jdbc:postgresql://${aws_db_instance.postgres.endpoint}/fallboot" },
       { name = "SPRING_DATASOURCE_USERNAME",     value = "myUser" },
       { name = "SPRING_DATASOURCE_PASSWORD",     value = var.db_password },
+      { name = "SPRING_DATA_REDIS_HOST",         value = aws_elasticache_cluster.redis.cache_nodes[0].address },
+      { name = "SPRING_DATA_REDIS_PORT",         value = "6379" },
       { name = "SPRING_KAFKA_BOOTSTRAP_SERVERS", value = aws_msk_cluster.kafka.bootstrap_brokers_tls },
+      { name = "AWS_REGION",                     value = "us-east-2" },
+      { name = "AWS_S3_BUCKET",                  value = aws_s3_bucket.snapshots.bucket },
+      { name = "FALLBOOT_CDN_BASE_URL",          value = "https://${aws_cloudfront_distribution.snapshots.domain_name}" },
     ]
 
     logConfiguration = {

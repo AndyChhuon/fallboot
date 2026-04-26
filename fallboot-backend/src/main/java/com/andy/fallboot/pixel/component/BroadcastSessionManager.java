@@ -5,6 +5,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -28,22 +29,25 @@ public class BroadcastSessionManager {
         }
     }
 
-    public void broadcast(String stompFrame) {
-        TextMessage message = new TextMessage(stompFrame);
+    public void broadcast(String roomId, String jsonPayload) {
+        TextMessage message = new TextMessage(jsonPayload);
         sessions.forEach((id, entry) -> {
             if (!entry.ready) return;
+            if (!Objects.equals(roomId, entry.session.getAttributes().get("roomId"))) return;
             if (!entry.session.isOpen()) {
                 sessions.remove(id);
                 return;
             }
-            entry.lock.lock();
-            try {
-                entry.session.sendMessage(message);
-            } catch (IOException e) {
-                sessions.remove(id);
-            } finally {
-                entry.lock.unlock();
-            }
+            Thread.startVirtualThread(() -> {
+                entry.lock.lock();
+                try {
+                    entry.session.sendMessage(message);
+                } catch (IOException | IllegalStateException e) {
+                    sessions.remove(id);
+                } finally {
+                    entry.lock.unlock();
+                }
+            });
         });
     }
 

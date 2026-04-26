@@ -13,8 +13,9 @@ public record PixelDTO(UUID roomUuid, int x, int y, String color, String lastUpd
                 Optional.ofNullable(pixel.getLastUpdatedBy()).map(User::getCognitoId).orElse(null));
     }
 
-    public static RoomPixelsResponseDTO toRoomPixelsResponseDTO(UUID roomID, Map<String, PixelDTO> pixelsMap) {
-        final Map<String, String> pixelsResponseMap = pixelsMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().color()));
-        return new RoomPixelsResponseDTO(roomID, pixelsResponseMap);
+    public static PixelVerificationResponseDTO toVerificationResponseDTO(UUID roomID, Map<String, PixelDTO> pixelsMap) {
+        final Map<String, String> pixelsResponseMap = pixelsMap.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().color()));
+        return new PixelVerificationResponseDTO(roomID, pixelsResponseMap);
     }
 }
